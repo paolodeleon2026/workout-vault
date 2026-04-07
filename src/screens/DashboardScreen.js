@@ -55,6 +55,7 @@ export default function DashboardScreen({ navigation }) {
   const [activeCategory, setActiveCategory] = useState('All');
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [sheetVisible, setSheetVisible] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [sortKey, setSortKey] = useState('alpha');
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
   const [sortBtnLayout, setSortBtnLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
@@ -75,6 +76,22 @@ export default function DashboardScreen({ navigation }) {
 
   function closeSheet() {
     setSheetVisible(false);
+  }
+
+  function handleEdit(video) {
+    navigation.navigate('Edit', {
+      video,
+      onSave: (updated) => setVideos((prev) => prev.map((v) => v.id === updated.id ? updated : v)),
+    });
+  }
+
+  function handleDelete(video) {
+    setDeleteTarget(video);
+  }
+
+  function confirmDelete() {
+    setVideos((prev) => prev.filter((v) => v.id !== deleteTarget.id));
+    setDeleteTarget(null);
   }
 
   function openSortMenu() {
@@ -168,6 +185,8 @@ export default function DashboardScreen({ navigation }) {
           <VideoCard
             video={item}
             onPress={() => openVideo(item)}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
           />
         )}
         ListEmptyComponent={
@@ -183,6 +202,8 @@ export default function DashboardScreen({ navigation }) {
         video={selectedVideo}
         visible={sheetVisible}
         onClose={closeSheet}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
       />
 
       {/* Sort popover */}
@@ -229,6 +250,39 @@ export default function DashboardScreen({ navigation }) {
               )}
             </TouchableOpacity>
           ))}
+        </View>
+      </Modal>
+
+      {/* Delete confirmation dialog */}
+      <Modal
+        visible={!!deleteTarget}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeleteTarget(null)}
+      >
+        <View style={styles.dialogOverlay}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>Delete video?</Text>
+            <Text style={styles.dialogSubtitle} numberOfLines={2}>
+              "{deleteTarget?.title}" will be permanently removed.
+            </Text>
+            <View style={styles.dialogActions}>
+              <TouchableOpacity
+                style={[styles.dialogBtn, styles.dialogBtnCancel]}
+                onPress={() => setDeleteTarget(null)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.dialogBtnCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dialogBtn, styles.dialogBtnDelete]}
+                onPress={confirmDelete}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.dialogBtnDeleteText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </Modal>
     </SafeAreaView>
@@ -381,5 +435,66 @@ const styles = StyleSheet.create({
   popoverLabelActive: {
     color: '#6C63FF',
     fontWeight: '600',
+  },
+  // Delete dialog
+  dialogOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  dialog: {
+    width: '100%',
+    backgroundColor: '#1E1E2E',
+    borderRadius: 18,
+    padding: 24,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  dialogTitle: {
+    color: '#FFF',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  dialogSubtitle: {
+    color: '#888',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  dialogActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  dialogBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 13,
+    borderRadius: 12,
+  },
+  dialogBtnCancel: {
+    backgroundColor: '#2A2A3E',
+  },
+  dialogBtnCancelText: {
+    color: '#CCC',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  dialogBtnDelete: {
+    backgroundColor: '#FF658422',
+    borderWidth: 1,
+    borderColor: '#FF658455',
+  },
+  dialogBtnDeleteText: {
+    color: '#FF6584',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

@@ -7,6 +7,7 @@ import {
   Dimensions,
   ScrollView,
   PanResponder,
+  TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { VideoView, useVideoPlayer } from 'expo-video';
@@ -16,7 +17,7 @@ const { width, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SHEET_HEIGHT = SCREEN_HEIGHT * 0.75;
 const VIDEO_HEIGHT = width * (9 / 16);
 
-export default function VideoBottomSheet({ video, visible, onClose }) {
+export default function VideoBottomSheet({ video, visible, onClose, onEdit, onDelete }) {
   const insets = useSafeAreaInsets();
 
   const player = useVideoPlayer(null, () => {});
@@ -115,6 +116,18 @@ export default function VideoBottomSheet({ video, visible, onClose }) {
             {video?.description ? (
               <Text style={styles.description}>{video.description}</Text>
             ) : null}
+
+            {/* Actions */}
+            <View style={styles.actions}>
+              <TouchableOpacity style={styles.actionBtn} onPress={() => { onClose(); onEdit?.(video); }} activeOpacity={0.8}>
+                <Ionicons name="pencil-outline" size={16} color="#CCC" />
+                <Text style={styles.actionText}>Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionBtn, styles.actionBtnDanger]} onPress={() => { onClose(); onDelete?.(video); }} activeOpacity={0.8}>
+                <Ionicons name="trash-outline" size={16} color="#FF6584" />
+                <Text style={[styles.actionText, styles.actionTextDanger]}>Delete</Text>
+              </TouchableOpacity>
+            </View>
           </ScrollView>
         </View>
       </View>
@@ -204,5 +217,33 @@ const styles = StyleSheet.create({
     color: '#888',
     fontSize: 14,
     lineHeight: 20,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    backgroundColor: '#2A2A3E',
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
+  actionBtnDanger: {
+    backgroundColor: '#FF658418',
+    borderWidth: 1,
+    borderColor: '#FF658433',
+  },
+  actionText: {
+    color: '#CCC',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  actionTextDanger: {
+    color: '#FF6584',
   },
 });

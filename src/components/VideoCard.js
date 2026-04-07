@@ -1,13 +1,33 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MOVEMENT_TYPE_ORDER } from '../data/placeholderData';
 
-export default function VideoCard({ video, onPress }) {
-  // Sort movement types in canonical order: Breaking → Flexibility → Mobility
+export default function VideoCard({ video, onPress, onEdit, onDelete }) {
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
+  const moreBtnRef = useRef(null);
+
   const sortedTypes = (video.movementTypes ?? []).slice().sort(
     (a, b) => MOVEMENT_TYPE_ORDER.indexOf(a) - MOVEMENT_TYPE_ORDER.indexOf(b)
   );
+
+  function openMenu() {
+    moreBtnRef.current?.measureInWindow((x, y, width, height) => {
+      setMenuPos({ x: x + width, y: y + height });
+      setMenuVisible(true);
+    });
+  }
+
+  function handleEdit() {
+    setMenuVisible(false);
+    onEdit?.(video);
+  }
+
+  function handleDelete() {
+    setMenuVisible(false);
+    onDelete?.(video);
+  }
 
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={onPress}>
@@ -27,6 +47,13 @@ export default function VideoCard({ video, onPress }) {
       <View style={styles.info}>
         <Text style={styles.title} numberOfLines={1}>{video.title}</Text>
 
+        {/* Movement types — directly below title */}
+        {sortedTypes.length > 0 && (
+          <Text style={styles.movementTypes} numberOfLines={1}>
+            {sortedTypes.join(' · ')}
+          </Text>
+        )}
+
         <View style={styles.metaRow}>
           <Ionicons name="time-outline" size={13} color="#888" />
           <Text style={styles.meta}>{video.duration}</Text>
@@ -35,14 +62,7 @@ export default function VideoCard({ video, onPress }) {
           <Text style={styles.meta}>{video.date}</Text>
         </View>
 
-        {/* Movement types — dim italic, low visual priority */}
-        {sortedTypes.length > 0 && (
-          <Text style={styles.movementTypes} numberOfLines={1}>
-            {sortedTypes.join(' · ')}
-          </Text>
-        )}
-
-        {/* Movement tags */}
+        {/* Movement tags — 16px gap from above content */}
         {video.tags?.length > 0 && (
           <View style={styles.tags}>
             {video.tags.map((tag) => (
@@ -54,9 +74,30 @@ export default function VideoCard({ video, onPress }) {
         )}
       </View>
 
-      <TouchableOpacity style={styles.moreBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      {/* Ellipsis button */}
+      <TouchableOpacity
+        ref={moreBtnRef}
+        style={styles.moreBtn}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        onPress={openMenu}
+      >
         <Ionicons name="ellipsis-vertical" size={18} color="#888" />
       </TouchableOpacity>
+
+      {/* Ellipsis popover */}
+      <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
+        <TouchableOpacity style={styles.menuBackdrop} activeOpacity={1} onPress={() => setMenuVisible(false)} />
+        <View style={[styles.menu, { top: menuPos.y + 4, right: 16 }]}>
+          <TouchableOpacity style={[styles.menuItem, styles.menuItemBorder]} onPress={handleEdit}>
+            <Ionicons name="pencil-outline" size={15} color="#CCC" />
+            <Text style={styles.menuLabel}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.menuItem} onPress={handleDelete}>
+            <Ionicons name="trash-outline" size={15} color="#FF6584" />
+            <Text style={[styles.menuLabel, styles.menuLabelDanger]}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </TouchableOpacity>
   );
 }
@@ -83,7 +124,6 @@ const styles = StyleSheet.create({
     marginRight: 12,
     flexShrink: 0,
     overflow: 'hidden',
-    position: 'relative',
   },
   thumbnailImage: {
     width: '100%',
@@ -111,6 +151,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
+  movementTypes: {
+    color: '#4A4A6A',
+    fontSize: 11,
+    fontStyle: 'italic',
+  },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -127,15 +172,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#555',
     marginHorizontal: 2,
   },
-  movementTypes: {
-    color: '#4A4A6A',
-    fontSize: 11,
-    fontStyle: 'italic',
-  },
   tags: {
     flexDirection: 'row',
     gap: 4,
     flexWrap: 'wrap',
+    marginTop: 12,
   },
   tag: {
     backgroundColor: '#2A2A3E',
@@ -150,5 +191,41 @@ const styles = StyleSheet.create({
   moreBtn: {
     padding: 4,
     marginLeft: 4,
+    alignSelf: 'flex-start',
+  },
+  menuBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  menu: {
+    position: 'absolute',
+    width: 140,
+    backgroundColor: '#1E1E2E',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2A2A3E',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 10,
+  },
+  menuItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#2A2A3E',
+  },
+  menuLabel: {
+    color: '#CCC',
+    fontSize: 14,
+  },
+  menuLabelDanger: {
+    color: '#FF6584',
   },
 });

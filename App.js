@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DashboardScreen from './src/screens/DashboardScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import UploadScreen from './src/screens/UploadScreen';
+import EditScreen from './src/screens/EditScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -56,6 +57,11 @@ export default function App() {
           <Stack.Screen
             name="Upload"
             component={UploadScreen}
+            options={{ presentation: 'modal' }}
+          />
+          <Stack.Screen
+            name="Edit"
+            component={EditScreen}
             options={{ presentation: 'modal' }}
           />
         </Stack.Navigator>

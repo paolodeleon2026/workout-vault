@@ -11,6 +11,7 @@ import {
   StatusBar,
   Image,
   Modal,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,23 +24,30 @@ function formatDate(d) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export default function UploadScreen({ navigation, route }) {
-  const [video, setVideo] = useState(null);
-  const [title, setTitle] = useState('');
-  const [selectedTypes, setSelectedTypes] = useState([]);
-  const [tags, setTags] = useState([]);
-  const [date, setDate] = useState(new Date());
-  const [description, setDescription] = useState('');
+function parseDate(str) {
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? new Date() : d;
+}
 
-  // Date picker visibility
+export default function EditScreen({ navigation, route }) {
+  const { video, onSave } = route.params;
+
+  const [thumbnail, setThumbnail] = useState(video.thumbnail);
+  const [title, setTitle] = useState(video.title ?? '');
+  const [selectedTypes, setSelectedTypes] = useState(video.movementTypes ?? []);
+  const [tags, setTags] = useState(video.tags ?? []);
+  const [date, setDate] = useState(parseDate(video.date));
+  const [description, setDescription] = useState(video.description ?? '');
+
   const [showPicker, setShowPicker] = useState(false);
-  const [iosTempDate, setIosTempDate] = useState(new Date());
+  const [iosTempDate, setIosTempDate] = useState(parseDate(video.date));
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
 
   const scrollRef = useRef(null);
   const formY = useRef(0);
   const tagsFieldY = useRef(0);
 
-  const canSubmit = video !== null && title.trim().length > 0 && selectedTypes.length > 0;
+  const canSave = title.trim().length > 0 && selectedTypes.length > 0;
 
   function toggleType(type) {
     setSelectedTypes((prev) =>
@@ -50,47 +58,45 @@ export default function UploadScreen({ navigation, route }) {
   async function pickVideo() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') return;
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: 'videos',
       allowsEditing: false,
       quality: 1,
     });
-
     if (!result.canceled && result.assets.length > 0) {
-      setVideo(result.assets[0]);
+      setThumbnail(result.assets[0].uri);
     }
   }
 
-  function handleSubmit() {
-    if (!canSubmit) return;
-
-    const newVideo = {
-      id: Date.now().toString(),
+  function handleSave() {
+    if (!canSave) return;
+    const updated = {
+      ...video,
       title: title.trim(),
-      duration: '0:00',
-      date: formatDate(date),
-      size: video.fileSize
-        ? `${(video.fileSize / 1e9).toFixed(1)} GB`
-        : 'Unknown',
-      thumbnail: video.uri,
-      category: null,
       movementTypes: selectedTypes,
       tags,
+      date: formatDate(date),
       description: description.trim(),
+      thumbnail,
     };
-
-    route.params?.onAdd(newVideo);
+    onSave?.(updated);
     navigation.goBack();
   }
 
-  // Android: picker fires onChange directly
+  function handleClose() {
+    setShowDiscardDialog(true);
+  }
+
+  function handleDiscard() {
+    setShowDiscardDialog(false);
+    navigation.goBack();
+  }
+
   function onAndroidChange(event, selected) {
     setShowPicker(false);
     if (event.type === 'set' && selected) setDate(selected);
   }
 
-  // iOS: picker fires onChange as the user scrolls
   function onIosChange(_, selected) {
     if (selected) setIosTempDate(selected);
   }
@@ -119,10 +125,10 @@ export default function UploadScreen({ navigation, route }) {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity onPress={handleClose} style={styles.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="close" size={22} color="#FFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Upload Video</Text>
+        <Text style={styles.headerTitle}>Edit Video</Text>
         <View style={{ width: 36 }} />
       </View>
 
@@ -137,23 +143,15 @@ export default function UploadScreen({ navigation, route }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Video picker */}
-          <TouchableOpacity
-            style={styles.videoPicker}
-            onPress={pickVideo}
-            activeOpacity={0.8}
-          >
-            {video ? (
+          {/* Video thumbnail / picker */}
+          <TouchableOpacity style={styles.videoPicker} onPress={pickVideo} activeOpacity={0.8}>
+            {thumbnail ? (
               <>
-                {/* Thumbnail behind overlay */}
-                <Image source={{ uri: video.uri }} style={styles.thumbnailBg} resizeMode="cover" />
-                {/* Dark overlay */}
+                <Image source={{ uri: thumbnail }} style={styles.thumbnailBg} resizeMode="cover" />
                 <View style={styles.thumbnailOverlay} />
-                {/* Success content */}
                 <View style={styles.videoSuccessContent}>
-                  <Ionicons name="checkmark-circle" size={36} color="#26de81" />
-                  <Text style={styles.videoSuccessLabel}>Upload successful</Text>
-                  <Text style={styles.videoPickedChange}>Tap to change</Text>
+                  <Ionicons name="videocam" size={28} color="rgba(255,255,255,0.9)" />
+                  <Text style={styles.videoSuccessLabel}>Tap to change video</Text>
                 </View>
               </>
             ) : (
@@ -172,9 +170,7 @@ export default function UploadScreen({ navigation, route }) {
 
             {/* Title */}
             <View style={styles.field}>
-              <Text style={styles.label}>
-                Title <Text style={styles.required}>*</Text>
-              </Text>
+              <Text style={styles.label}>Title <Text style={styles.required}>*</Text></Text>
               <TextInput
                 style={styles.input}
                 value={title}
@@ -187,9 +183,7 @@ export default function UploadScreen({ navigation, route }) {
 
             {/* Movement Type */}
             <View style={styles.field}>
-              <Text style={styles.label}>
-                Movement Type <Text style={styles.required}>*</Text>
-              </Text>
+              <Text style={styles.label}>Movement Type <Text style={styles.required}>*</Text></Text>
               <View style={styles.typeChips}>
                 {movementTypes.map((type) => {
                   const active = selectedTypes.includes(type);
@@ -234,8 +228,6 @@ export default function UploadScreen({ navigation, route }) {
                 <Text style={styles.dateBtnText}>{formatDate(date)}</Text>
                 <Ionicons name="chevron-down" size={16} color="#555" style={{ marginLeft: 'auto' }} />
               </TouchableOpacity>
-
-              {/* Android: picker renders as a system dialog directly */}
               {Platform.OS === 'android' && showPicker && (
                 <DateTimePicker
                   value={date}
@@ -265,16 +257,16 @@ export default function UploadScreen({ navigation, route }) {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Submit button — outside KeyboardAvoidingView so keyboard slides under it */}
+      {/* Save button — outside KeyboardAvoidingView so keyboard slides under it */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
-          onPress={handleSubmit}
-          activeOpacity={canSubmit ? 0.8 : 1}
+          style={[styles.submitBtn, !canSave && styles.submitBtnDisabled]}
+          onPress={handleSave}
+          activeOpacity={canSave ? 0.8 : 1}
         >
-          <Ionicons name="cloud-upload-outline" size={20} color={canSubmit ? '#FFF' : '#444'} />
-          <Text style={[styles.submitText, !canSubmit && styles.submitTextDisabled]}>
-            Upload Video
+          <Ionicons name="checkmark" size={20} color={canSave ? '#FFF' : '#444'} />
+          <Text style={[styles.submitText, !canSave && styles.submitTextDisabled]}>
+            Save Changes
           </Text>
         </TouchableOpacity>
       </View>
@@ -306,15 +298,38 @@ export default function UploadScreen({ navigation, route }) {
           </View>
         </Modal>
       )}
+
+      {/* Discard changes dialog */}
+      <Modal visible={showDiscardDialog} transparent animationType="fade" onRequestClose={() => setShowDiscardDialog(false)}>
+        <View style={styles.dialogOverlay}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>Discard changes?</Text>
+            <Text style={styles.dialogSubtitle}>Changes made will not be saved.</Text>
+            <View style={styles.dialogActions}>
+              <TouchableOpacity
+                style={[styles.dialogBtn, styles.dialogBtnCancel]}
+                onPress={() => setShowDiscardDialog(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.dialogBtnCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dialogBtn, styles.dialogBtnDiscard]}
+                onPress={handleDiscard}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.dialogBtnDiscardText}>Discard</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#12121E',
-  },
+  safe: { flex: 1, backgroundColor: '#12121E' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -324,219 +339,99 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   closeBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1E1E2E',
-    borderRadius: 18,
+    width: 36, height: 36,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#1E1E2E', borderRadius: 18,
   },
-  headerTitle: {
-    color: '#FFF',
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 24,
-  },
+  headerTitle: { color: '#FFF', fontSize: 17, fontWeight: '700' },
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 24 },
   videoPicker: {
-    height: 160,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#2A2A3E',
-    borderStyle: 'dashed',
-    marginBottom: 24,
-    overflow: 'hidden',
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
+    height: 160, borderRadius: 16, borderWidth: 2,
+    borderColor: '#2A2A3E', borderStyle: 'dashed',
+    marginBottom: 24, overflow: 'hidden',
+    alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#1E1E2E',
   },
-  thumbnailBg: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  thumbnailOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
-  videoSuccessContent: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  videoSuccessLabel: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  videoPickedChange: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 12,
-  },
-  videoPickerInner: {
-    alignItems: 'center',
-    gap: 8,
-  },
+  thumbnailBg: { ...StyleSheet.absoluteFillObject },
+  thumbnailOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
+  videoSuccessContent: { alignItems: 'center', gap: 8 },
+  videoSuccessLabel: { color: '#FFF', fontSize: 15, fontWeight: '600' },
+  videoPickerInner: { alignItems: 'center', gap: 8 },
   videoPickerIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 64, height: 64, borderRadius: 32,
     backgroundColor: '#6C63FF22',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 4,
   },
-  videoPickerLabel: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  videoPickerHint: {
-    color: '#555',
-    fontSize: 13,
-  },
-  form: {
-    gap: 20,
-  },
-  field: {
-    gap: 8,
-  },
-  label: {
-    color: '#AAA',
-    fontSize: 13,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  required: {
-    color: '#FF6584',
-  },
+  videoPickerLabel: { color: '#FFF', fontSize: 16, fontWeight: '600' },
+  videoPickerHint: { color: '#555', fontSize: 13 },
+  form: { gap: 20 },
+  field: { gap: 8 },
+  label: { color: '#AAA', fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8 },
+  required: { color: '#FF6584' },
   input: {
-    backgroundColor: '#1E1E2E',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: '#FFF',
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: '#2A2A3E',
+    backgroundColor: '#1E1E2E', borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 12,
+    color: '#FFF', fontSize: 15, borderWidth: 1, borderColor: '#2A2A3E',
   },
-  textarea: {
-    height: 100,
-    paddingTop: 12,
-  },
-  typeChips: {
-    flexDirection: 'row',
-    gap: 10,
-  },
+  textarea: { height: 100, paddingTop: 12 },
+  typeChips: { flexDirection: 'row', gap: 10 },
   typeChip: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 11,
-    borderRadius: 10,
-    backgroundColor: '#1E1E2E',
-    borderWidth: 1,
-    borderColor: '#2A2A3E',
+    flex: 1, alignItems: 'center', paddingVertical: 11,
+    borderRadius: 10, backgroundColor: '#1E1E2E',
+    borderWidth: 1, borderColor: '#2A2A3E',
   },
-  typeChipActive: {
-    backgroundColor: '#6C63FF22',
-    borderColor: '#6C63FF',
-  },
-  typeChipText: {
-    color: '#666',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  typeChipTextActive: {
-    color: '#6C63FF',
-    fontWeight: '700',
-  },
-  typeHint: {
-    color: '#FF6584',
-    fontSize: 12,
-    marginTop: 2,
-  },
+  typeChipActive: { backgroundColor: '#6C63FF22', borderColor: '#6C63FF' },
+  typeChipText: { color: '#666', fontSize: 14, fontWeight: '500' },
+  typeChipTextActive: { color: '#6C63FF', fontWeight: '700' },
+  typeHint: { color: '#FF6584', fontSize: 12, marginTop: 2 },
   dateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E1E2E',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#2A2A3E',
-    gap: 10,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#1E1E2E', borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 12,
+    borderWidth: 1, borderColor: '#2A2A3E', gap: 10,
   },
-  dateBtnText: {
-    color: '#FFF',
-    fontSize: 15,
-  },
-  footer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#1E1E2E',
-  },
+  dateBtnText: { color: '#FFF', fontSize: 15 },
+  footer: { paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#1E1E2E' },
   submitBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#6C63FF',
-    borderRadius: 14,
-    paddingVertical: 16,
-    gap: 8,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 6,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#6C63FF', borderRadius: 14, paddingVertical: 16, gap: 8,
+    shadowColor: '#6C63FF', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4, shadowRadius: 8, elevation: 6,
   },
-  submitBtnDisabled: {
-    backgroundColor: '#1E1E2E',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  submitText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  submitTextDisabled: {
-    color: '#444',
-  },
-  // iOS date picker modal
-  iosPickerOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  iosPickerBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  iosPickerSheet: {
-    backgroundColor: '#1E1E2E',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingBottom: 24,
-  },
+  submitBtnDisabled: { backgroundColor: '#1E1E2E', shadowOpacity: 0, elevation: 0 },
+  submitText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  submitTextDisabled: { color: '#444' },
+  iosPickerOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  iosPickerBackdrop: { ...StyleSheet.absoluteFillObject },
+  iosPickerSheet: { backgroundColor: '#1E1E2E', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 24 },
   iosPickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2A2A3E',
+    flexDirection: 'row', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: '#2A2A3E',
   },
-  iosPickerCancel: {
-    color: '#888',
-    fontSize: 16,
+  iosPickerCancel: { color: '#888', fontSize: 16 },
+  iosPickerDone: { color: '#6C63FF', fontSize: 16, fontWeight: '700' },
+  iosPicker: { height: 200 },
+  // Discard dialog
+  dialogOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center', justifyContent: 'center', padding: 32,
   },
-  iosPickerDone: {
-    color: '#6C63FF',
-    fontSize: 16,
-    fontWeight: '700',
+  dialog: {
+    width: '100%', backgroundColor: '#1E1E2E',
+    borderRadius: 18, padding: 24, gap: 8,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4, shadowRadius: 16, elevation: 12,
   },
-  iosPicker: {
-    height: 200,
+  dialogTitle: { color: '#FFF', fontSize: 17, fontWeight: '700' },
+  dialogSubtitle: { color: '#888', fontSize: 14, lineHeight: 20, marginBottom: 8 },
+  dialogActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  dialogBtn: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 13, borderRadius: 12,
   },
+  dialogBtnCancel: { backgroundColor: '#2A2A3E' },
+  dialogBtnCancelText: { color: '#CCC', fontSize: 15, fontWeight: '600' },
+  dialogBtnDiscard: { backgroundColor: '#FF658422', borderWidth: 1, borderColor: '#FF658455' },
+  dialogBtnDiscardText: { color: '#FF6584', fontSize: 15, fontWeight: '700' },
 });

@@ -10,7 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { movementTags as defaultTags } from '../data/placeholderData';
 
-export default function TagInput({ selectedTags, onTagsChange }) {
+export default function TagInput({ selectedTags, onTagsChange, onFocus, onBlur }) {
   const [query, setQuery] = useState('');
   const [allTags, setAllTags] = useState(defaultTags);
   const inputRef = useRef(null);
@@ -86,6 +86,8 @@ export default function TagInput({ selectedTags, onTagsChange }) {
           placeholderTextColor="#555"
           autoCorrect={false}
           autoCapitalize="none"
+          onFocus={onFocus}
+          onBlur={onBlur}
         />
         {query.length > 0 && (
           <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
