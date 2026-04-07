@@ -1,0 +1,85 @@
+export const workoutVideos = [
+  {
+    id: '1',
+    title: 'Morning Chest & Triceps',
+    duration: '42:18',
+    date: 'Today, 6:30 AM',
+    size: '1.2 GB',
+    thumbnail: null,
+    category: 'Strength',
+    tags: ['Chest', 'Triceps'],
+  },
+  {
+    id: '2',
+    title: 'Leg Day – Squats & Deadlifts',
+    duration: '55:04',
+    date: 'Yesterday, 7:00 AM',
+    size: '1.8 GB',
+    thumbnail: null,
+    category: 'Strength',
+    tags: ['Legs', 'Glutes'],
+  },
+  {
+    id: '3',
+    title: '5K Treadmill Run',
+    duration: '28:33',
+    date: 'Apr 5, 8:15 AM',
+    size: '890 MB',
+    thumbnail: null,
+    category: 'Cardio',
+    tags: ['Running'],
+  },
+  {
+    id: '4',
+    title: 'Back & Biceps',
+    duration: '48:11',
+    date: 'Apr 4, 6:45 AM',
+    size: '1.5 GB',
+    thumbnail: null,
+    category: 'Strength',
+    tags: ['Back', 'Biceps'],
+  },
+  {
+    id: '5',
+    title: 'HIIT Circuit – Full Body',
+    duration: '35:00',
+    date: 'Apr 3, 7:30 AM',
+    size: '1.1 GB',
+    thumbnail: null,
+    category: 'HIIT',
+    tags: ['Full Body'],
+  },
+  {
+    id: '6',
+    title: 'Shoulder Press & Lateral Raises',
+    duration: '38:22',
+    date: 'Apr 2, 6:00 AM',
+    size: '1.3 GB',
+    thumbnail: null,
+    category: 'Strength',
+    tags: ['Shoulders'],
+  },
+];
+
+export const stats = {
+  totalVideos: 24,
+  totalStorage: '18.4 GB',
+  storageUsed: 0.62,
+  thisWeek: 4,
+  totalDuration: '19h 42m',
+};
+
+export const categories = ['All', 'Breaking', 'Flexibility', 'Mobility'];
+
+export const movementTypes = ['Breaking', 'Flexibility', 'Mobility'];
+
+// Canonical sort order for display in video cards
+export const MOVEMENT_TYPE_ORDER = ['Breaking', 'Flexibility', 'Mobility'];
+
+export const movementTags = [
+  'Windmill', 'Headspin', 'Flare', 'Airflare', 'Swipe', 'Backspin',
+  'Turtleback', 'Cricket', 'Turtle', 'Elbow spin', 'Halos', '1990s',
+  '2000s', 'Airtrack', 'Jackhammer', 'Hollow back', 'Deadman',
+  'Nutcracker', 'Munchmill', 'Superman', 'UFO', 'Lotus',
+  'Shoulder spin', 'Knee spin', 'Coin drop', 'Reverse halo', 'Halo',
+];
