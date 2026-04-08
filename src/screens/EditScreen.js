@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
-  Image,
   Modal,
   Alert,
 } from 'react-native';
@@ -18,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import TagInput from '../components/TagInput';
-import { movementTypes } from '../data/placeholderData';
+import { movementDisciplines } from '../data/placeholderData';
 
 function formatDate(d) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -49,22 +48,23 @@ export default function EditScreen({ navigation, route }) {
 
   const canSave = title.trim().length > 0 && selectedTypes.length > 0;
 
-  function toggleType(type) {
-    setSelectedTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
-    );
-  }
-
   async function pickVideo() {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') return;
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'videos',
-      allowsEditing: false,
-      quality: 1,
-    });
-    if (!result.canceled && result.assets.length > 0) {
-      setThumbnail(result.assets[0].uri);
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') return;
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: 'videos',
+        allowsEditing: false,
+        quality: 1,
+      });
+      if (!result.canceled && result.assets.length > 0) {
+        const asset = result.assets[0];
+        if (asset.uri) {
+          setThumbnail(asset.uri);
+        }
+      }
+    } catch (e) {
+      // Edited or iCloud videos can fail to export — silently ignore
     }
   }
 
@@ -77,7 +77,7 @@ export default function EditScreen({ navigation, route }) {
       tags,
       date: formatDate(date),
       description: description.trim(),
-      thumbnail,
+      thumbnail: null,
     };
     onSave?.(updated);
     navigation.goBack();
@@ -146,14 +146,10 @@ export default function EditScreen({ navigation, route }) {
           {/* Video thumbnail / picker */}
           <TouchableOpacity style={styles.videoPicker} onPress={pickVideo} activeOpacity={0.8}>
             {thumbnail ? (
-              <>
-                <Image source={{ uri: thumbnail }} style={styles.thumbnailBg} resizeMode="cover" />
-                <View style={styles.thumbnailOverlay} />
-                <View style={styles.videoSuccessContent}>
-                  <Ionicons name="videocam" size={28} color="rgba(255,255,255,0.9)" />
-                  <Text style={styles.videoSuccessLabel}>Tap to change video</Text>
-                </View>
-              </>
+              <View style={styles.videoSuccessContent}>
+                <Ionicons name="videocam" size={28} color="rgba(255,255,255,0.9)" />
+                <Text style={styles.videoSuccessLabel}>Tap to change video</Text>
+              </View>
             ) : (
               <View style={styles.videoPickerInner}>
                 <View style={styles.videoPickerIcon}>
@@ -181,29 +177,15 @@ export default function EditScreen({ navigation, route }) {
               />
             </View>
 
-            {/* Movement Type */}
-            <View style={styles.field}>
-              <Text style={styles.label}>Movement Type <Text style={styles.required}>*</Text></Text>
-              <View style={styles.typeChips}>
-                {movementTypes.map((type) => {
-                  const active = selectedTypes.includes(type);
-                  return (
-                    <TouchableOpacity
-                      key={type}
-                      style={[styles.typeChip, active && styles.typeChipActive]}
-                      onPress={() => toggleType(type)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.typeChipText, active && styles.typeChipTextActive]}>
-                        {type}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-              {selectedTypes.length === 0 && (
-                <Text style={styles.typeHint}>Select at least one</Text>
-              )}
+            {/* Movement Discipline */}
+            <View style={[styles.field, { zIndex: 20 }]}>
+              <Text style={styles.label}>Movement Discipline <Text style={styles.required}>*</Text></Text>
+              <TagInput
+                selectedTags={selectedTypes}
+                onTagsChange={setSelectedTypes}
+                predefinedValues={movementDisciplines}
+                placeholder="Search disciplines..."
+              />
             </View>
 
             {/* Movement Tags */}
@@ -211,12 +193,13 @@ export default function EditScreen({ navigation, route }) {
               style={[styles.field, { zIndex: 10 }]}
               onLayout={(e) => { tagsFieldY.current = e.nativeEvent.layout.y; }}
             >
-              <Text style={styles.label}>Movement Tags</Text>
+              <Text style={styles.label}>Skills</Text>
               <TagInput
                 selectedTags={tags}
                 onTagsChange={setTags}
                 onFocus={scrollToTagsField}
                 onBlur={scrollToTop}
+                placeholder="e.g. Side kicks, windmills, front splits, etc."
               />
             </View>
 
@@ -352,8 +335,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#1E1E2E',
   },
-  thumbnailBg: { ...StyleSheet.absoluteFillObject },
-  thumbnailOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
   videoSuccessContent: { alignItems: 'center', gap: 8 },
   videoSuccessLabel: { color: '#FFF', fontSize: 15, fontWeight: '600' },
   videoPickerInner: { alignItems: 'center', gap: 8 },
@@ -374,15 +355,6 @@ const styles = StyleSheet.create({
     color: '#FFF', fontSize: 15, borderWidth: 1, borderColor: '#2A2A3E',
   },
   textarea: { height: 100, paddingTop: 12 },
-  typeChips: { flexDirection: 'row', gap: 10 },
-  typeChip: {
-    flex: 1, alignItems: 'center', paddingVertical: 11,
-    borderRadius: 10, backgroundColor: '#1E1E2E',
-    borderWidth: 1, borderColor: '#2A2A3E',
-  },
-  typeChipActive: { backgroundColor: '#6C63FF22', borderColor: '#6C63FF' },
-  typeChipText: { color: '#666', fontSize: 14, fontWeight: '500' },
-  typeChipTextActive: { color: '#6C63FF', fontWeight: '700' },
   typeHint: { color: '#FF6584', fontSize: 12, marginTop: 2 },
   dateBtn: {
     flexDirection: 'row', alignItems: 'center',

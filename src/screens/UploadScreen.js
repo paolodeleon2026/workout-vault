@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
-  Image,
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import TagInput from '../components/TagInput';
-import { movementTypes } from '../data/placeholderData';
+import { movementDisciplines } from '../data/placeholderData';
 
 function formatDate(d) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -41,24 +40,25 @@ export default function UploadScreen({ navigation, route }) {
 
   const canSubmit = video !== null && title.trim().length > 0 && selectedTypes.length > 0;
 
-  function toggleType(type) {
-    setSelectedTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
-    );
-  }
-
   async function pickVideo() {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') return;
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') return;
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'videos',
-      allowsEditing: false,
-      quality: 1,
-    });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: 'videos',
+        allowsEditing: false,
+        quality: 1,
+      });
 
-    if (!result.canceled && result.assets.length > 0) {
-      setVideo(result.assets[0]);
+      if (!result.canceled && result.assets.length > 0) {
+        const asset = result.assets[0];
+        if (asset.uri) {
+          setVideo(asset);
+        }
+      }
+    } catch (e) {
+      // Edited or iCloud videos can fail to export — silently ignore
     }
   }
 
@@ -73,7 +73,7 @@ export default function UploadScreen({ navigation, route }) {
       size: video.fileSize
         ? `${(video.fileSize / 1e9).toFixed(1)} GB`
         : 'Unknown',
-      thumbnail: video.uri,
+      thumbnail: null,
       category: null,
       movementTypes: selectedTypes,
       tags,
@@ -144,18 +144,11 @@ export default function UploadScreen({ navigation, route }) {
             activeOpacity={0.8}
           >
             {video ? (
-              <>
-                {/* Thumbnail behind overlay */}
-                <Image source={{ uri: video.uri }} style={styles.thumbnailBg} resizeMode="cover" />
-                {/* Dark overlay */}
-                <View style={styles.thumbnailOverlay} />
-                {/* Success content */}
-                <View style={styles.videoSuccessContent}>
-                  <Ionicons name="checkmark-circle" size={36} color="#26de81" />
-                  <Text style={styles.videoSuccessLabel}>Upload successful</Text>
-                  <Text style={styles.videoPickedChange}>Tap to change</Text>
-                </View>
-              </>
+              <View style={styles.videoSuccessContent}>
+                <Ionicons name="checkmark-circle" size={36} color="#26de81" />
+                <Text style={styles.videoSuccessLabel}>Video selected</Text>
+                <Text style={styles.videoPickedChange}>Tap to change</Text>
+              </View>
             ) : (
               <View style={styles.videoPickerInner}>
                 <View style={styles.videoPickerIcon}>
@@ -185,31 +178,17 @@ export default function UploadScreen({ navigation, route }) {
               />
             </View>
 
-            {/* Movement Type */}
-            <View style={styles.field}>
+            {/* Movement Discipline */}
+            <View style={[styles.field, { zIndex: 20 }]}>
               <Text style={styles.label}>
-                Movement Type <Text style={styles.required}>*</Text>
+                Movement Discipline <Text style={styles.required}>*</Text>
               </Text>
-              <View style={styles.typeChips}>
-                {movementTypes.map((type) => {
-                  const active = selectedTypes.includes(type);
-                  return (
-                    <TouchableOpacity
-                      key={type}
-                      style={[styles.typeChip, active && styles.typeChipActive]}
-                      onPress={() => toggleType(type)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.typeChipText, active && styles.typeChipTextActive]}>
-                        {type}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-              {selectedTypes.length === 0 && (
-                <Text style={styles.typeHint}>Select at least one</Text>
-              )}
+              <TagInput
+                selectedTags={selectedTypes}
+                onTagsChange={setSelectedTypes}
+                predefinedValues={movementDisciplines}
+                placeholder="Search disciplines..."
+              />
             </View>
 
             {/* Movement Tags */}
@@ -217,12 +196,13 @@ export default function UploadScreen({ navigation, route }) {
               style={[styles.field, { zIndex: 10 }]}
               onLayout={(e) => { tagsFieldY.current = e.nativeEvent.layout.y; }}
             >
-              <Text style={styles.label}>Movement Tags</Text>
+              <Text style={styles.label}>Skills</Text>
               <TagInput
                 selectedTags={tags}
                 onTagsChange={setTags}
                 onFocus={scrollToTagsField}
                 onBlur={scrollToTop}
+                placeholder="e.g. Side kicks, windmills, front splits, etc."
               />
             </View>
 
@@ -272,7 +252,6 @@ export default function UploadScreen({ navigation, route }) {
           onPress={handleSubmit}
           activeOpacity={canSubmit ? 0.8 : 1}
         >
-          <Ionicons name="cloud-upload-outline" size={20} color={canSubmit ? '#FFF' : '#444'} />
           <Text style={[styles.submitText, !canSubmit && styles.submitTextDisabled]}>
             Upload Video
           </Text>
@@ -353,13 +332,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#1E1E2E',
   },
-  thumbnailBg: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  thumbnailOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
   videoSuccessContent: {
     alignItems: 'center',
     gap: 8,
@@ -424,32 +396,6 @@ const styles = StyleSheet.create({
   textarea: {
     height: 100,
     paddingTop: 12,
-  },
-  typeChips: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  typeChip: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 11,
-    borderRadius: 10,
-    backgroundColor: '#1E1E2E',
-    borderWidth: 1,
-    borderColor: '#2A2A3E',
-  },
-  typeChipActive: {
-    backgroundColor: '#6C63FF22',
-    borderColor: '#6C63FF',
-  },
-  typeChipText: {
-    color: '#666',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  typeChipTextActive: {
-    color: '#6C63FF',
-    fontWeight: '700',
   },
   typeHint: {
     color: '#FF6584',

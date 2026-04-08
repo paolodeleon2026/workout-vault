@@ -12,9 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import VideoCard from '../components/VideoCard';
-import StorageBar from '../components/StorageBar';
 import VideoBottomSheet from '../components/VideoBottomSheet';
-import { stats, categories } from '../data/placeholderData';
+import FilterSheet from '../components/FilterSheet';
 
 const SORT_OPTIONS = [
   { key: 'alpha', label: 'Alphabetical', icon: 'text-outline' },
@@ -52,7 +51,9 @@ function durationToSecs(dur) {
 
 export default function DashboardScreen({ navigation }) {
   const [videos, setVideos] = useState([]);
-  const [activeCategory, setActiveCategory] = useState('All');
+  const [activeDisciplines, setActiveDisciplines] = useState([]);
+  const [activeSkills, setActiveSkills] = useState([]);
+  const [filterSheetVisible, setFilterSheetVisible] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -61,13 +62,28 @@ export default function DashboardScreen({ navigation }) {
   const [sortBtnLayout, setSortBtnLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const sortBtnRef = useRef(null);
 
-  const baseFiltered =
-    activeCategory === 'All'
-      ? videos
-      : videos.filter((v) => v.movementTypes?.includes(activeCategory));
+  // Derive available filter options and counts from actual library content
+  const availableDisciplines = [...new Set(videos.flatMap((v) => v.movementTypes ?? []))].sort();
+  const availableSkills = [...new Set(videos.flatMap((v) => v.tags ?? []))].sort();
+
+  const disciplineCounts = {};
+  videos.forEach((v) => (v.movementTypes ?? []).forEach((d) => { disciplineCounts[d] = (disciplineCounts[d] || 0) + 1; }));
+  const skillCounts = {};
+  videos.forEach((v) => (v.tags ?? []).forEach((s) => { skillCounts[s] = (skillCounts[s] || 0) + 1; }));
+
+  const baseFiltered = videos.filter((v) => {
+    const disciplineMatch =
+      activeDisciplines.length === 0 ||
+      activeDisciplines.some((d) => v.movementTypes?.includes(d));
+    const skillMatch =
+      activeSkills.length === 0 ||
+      activeSkills.some((s) => v.tags?.includes(s));
+    return disciplineMatch && skillMatch;
+  });
 
   const filteredVideos = sortVideos(baseFiltered, sortKey);
   const activeSort = SORT_OPTIONS.find((o) => o.key === sortKey);
+  const totalActiveFilters = activeDisciplines.length + activeSkills.length;
 
   function openVideo(video) {
     setSelectedVideo(video);
@@ -106,7 +122,12 @@ export default function DashboardScreen({ navigation }) {
     setSortMenuVisible(false);
   }
 
-  const sectionLabel = activeCategory === 'All' ? 'All Videos' : activeCategory;
+  function removeFilter(type, value) {
+    if (type === 'discipline') setActiveDisciplines((prev) => prev.filter((d) => d !== value));
+    else setActiveSkills((prev) => prev.filter((s) => s !== value));
+  }
+
+  const sectionLabel = `All Videos${filteredVideos.length !== videos.length ? ` (${filteredVideos.length})` : ''}`;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -114,21 +135,12 @@ export default function DashboardScreen({ navigation }) {
 
       {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Good morning 👋</Text>
-          <Text style={styles.title}>Workout Vault</Text>
+        <Text style={styles.title}>Movement Log</Text>
+        <View style={styles.betaTag}>
+          <Text style={styles.betaText}>Beta</Text>
         </View>
-        <TouchableOpacity
-          style={styles.uploadBtn}
-          activeOpacity={0.8}
-          onPress={() => navigation.navigate('Upload', {
-            onAdd: (video) => setVideos((v) => [video, ...v]),
-          })}
-        >
-          <Ionicons name="cloud-upload-outline" size={20} color="#FFF" />
-          <Text style={styles.uploadText}>Upload</Text>
-        </TouchableOpacity>
       </View>
+
 
       <FlatList
         data={filteredVideos}
@@ -136,49 +148,66 @@ export default function DashboardScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <>
-            {/* Storage */}
-            <StorageBar
-              used={stats.totalStorage}
-              total="30 GB"
-              percentage={stats.storageUsed}
-            />
-
-            {/* Category Filter */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categories}
-              style={styles.categoriesScroll}
-            >
-              {categories.map((cat) => (
-                <TouchableOpacity
-                  key={cat}
-                  style={[styles.chip, activeCategory === cat && styles.chipActive]}
-                  onPress={() => setActiveCategory(cat)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.chipText, activeCategory === cat && styles.chipTextActive]}>
-                    {cat}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            {/* Section label + Sort */}
+            {/* Section label + Filter + Sort */}
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>{sectionLabel}</Text>
+              <View style={styles.sectionActions}>
+                <TouchableOpacity
+                  style={[styles.filterBtn, totalActiveFilters > 0 && styles.filterBtnActive]}
+                  onPress={() => setFilterSheetVisible(true)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="options-outline" size={15} color={totalActiveFilters > 0 ? '#6C63FF' : '#888'} />
+                  <Text style={[styles.filterBtnText, totalActiveFilters > 0 && styles.filterBtnTextActive]}>
+                    Filter{totalActiveFilters > 0 ? ` (${totalActiveFilters})` : ''}
+                  </Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                ref={sortBtnRef}
-                style={styles.sortBtn}
-                onPress={openSortMenu}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="swap-vertical-outline" size={15} color="#888" />
-                <Text style={styles.sortBtnText}>{activeSort.label}</Text>
-                <Ionicons name="chevron-down" size={13} color="#555" />
-              </TouchableOpacity>
+                <TouchableOpacity
+                  ref={sortBtnRef}
+                  style={styles.sortBtn}
+                  onPress={openSortMenu}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="swap-vertical-outline" size={15} color="#888" />
+                  <Text style={styles.sortBtnText}>{activeSort.label}</Text>
+                  <Ionicons name="chevron-down" size={13} color="#555" />
+                </TouchableOpacity>
+              </View>
             </View>
+
+            {/* Active filter chips */}
+            {totalActiveFilters > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.activeChips}
+                style={styles.activeChipsScroll}
+              >
+                {activeDisciplines.map((d) => (
+                  <TouchableOpacity
+                    key={`d-${d}`}
+                    style={styles.activeChip}
+                    onPress={() => removeFilter('discipline', d)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.activeChipText}>{d}</Text>
+                    <Ionicons name="close" size={12} color="#6C63FF" style={{ marginLeft: 4 }} />
+                  </TouchableOpacity>
+                ))}
+                {activeSkills.map((s) => (
+                  <TouchableOpacity
+                    key={`s-${s}`}
+                    style={styles.activeChip}
+                    onPress={() => removeFilter('skill', s)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.activeChipText}>{s}</Text>
+                    <Ionicons name="close" size={12} color="#6C63FF" style={{ marginLeft: 4 }} />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
           </>
         }
         renderItem={({ item }) => (
@@ -204,6 +233,33 @@ export default function DashboardScreen({ navigation }) {
         onClose={closeSheet}
         onEdit={handleEdit}
         onDelete={handleDelete}
+      />
+
+      {/* Floating upload button */}
+      <TouchableOpacity
+        style={[styles.fab, styles.fabExpanded]}
+        activeOpacity={0.8}
+        onPress={() => navigation.navigate('Upload', {
+          onAdd: (video) => setVideos((v) => [video, ...v]),
+        })}
+      >
+        <Ionicons name="cloud-upload-outline" size={22} color="#FFF" />
+        <Text style={styles.fabText}>Upload</Text>
+      </TouchableOpacity>
+
+      <FilterSheet
+        visible={filterSheetVisible}
+        onClose={() => setFilterSheetVisible(false)}
+        availableDisciplines={availableDisciplines}
+        availableSkills={availableSkills}
+        disciplineCounts={disciplineCounts}
+        skillCounts={skillCounts}
+        activeDisciplines={activeDisciplines}
+        activeSkills={activeSkills}
+        onApply={(disciplines, skills) => {
+          setActiveDisciplines(disciplines);
+          setActiveSkills(skills);
+        }}
       />
 
       {/* Sort popover */}
@@ -301,64 +357,79 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 20,
-  },
-  greeting: {
-    color: '#888',
-    fontSize: 13,
-    marginBottom: 2,
+    zIndex: 1,
   },
   title: {
     color: '#FFF',
     fontSize: 26,
     fontWeight: '800',
     letterSpacing: 0.3,
+    lineHeight: 30,
   },
-  uploadBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  betaTag: {
+    backgroundColor: '#6C63FF22',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: '#6C63FF55',
+  },
+  betaText: {
+    color: '#6C63FF',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#6C63FF',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 24,
-    gap: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
     shadowColor: '#6C63FF',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  uploadText: {
+  fabExpanded: {
+    width: 'auto',
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  fabText: {
     color: '#FFF',
+    fontSize: 15,
     fontWeight: '700',
-    fontSize: 14,
   },
-  categoriesScroll: {
-    marginBottom: 4,
+  activeChipsScroll: {
+    marginTop: 12,
   },
-  categories: {
+  activeChips: {
     paddingHorizontal: 16,
     gap: 8,
     paddingBottom: 4,
   },
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  activeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: '#1E1E2E',
+    backgroundColor: '#6C63FF22',
     borderWidth: 1,
-    borderColor: '#2A2A3E',
+    borderColor: '#6C63FF44',
   },
-  chipActive: {
-    backgroundColor: '#6C63FF',
-    borderColor: '#6C63FF',
-  },
-  chipText: {
-    color: '#888',
-    fontWeight: '600',
+  activeChipText: {
+    color: '#6C63FF',
     fontSize: 13,
-  },
-  chipTextActive: {
-    color: '#FFF',
+    fontWeight: '600',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -372,6 +443,26 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 17,
     fontWeight: '700',
+  },
+  sectionActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  filterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  filterBtnActive: {},
+  filterBtnText: {
+    color: '#888',
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  filterBtnTextActive: {
+    color: '#6C63FF',
+    fontWeight: '600',
   },
   sortBtn: {
     flexDirection: 'row',
@@ -392,6 +483,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingTop: 60,
+    marginTop: -96,
     gap: 12,
   },
   emptyText: {

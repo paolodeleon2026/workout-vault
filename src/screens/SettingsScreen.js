@@ -77,18 +77,6 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Storage section */}
-        <SettingsSection title="Storage">
-          <SettingsRow
-            icon="server-outline"
-            iconColor="#6C63FF"
-            label="Storage Location"
-            value="iCloud"
-            chevron
-            isLast
-          />
-        </SettingsSection>
-
         {/* Upload section */}
         <SettingsSection title="Upload">
           <SettingsRow
@@ -98,13 +86,6 @@ export default function SettingsScreen() {
             toggle
             toggleValue={wifiOnly}
             onToggle={setWifiOnly}
-          />
-          <SettingsRow
-            icon="videocam-outline"
-            iconColor="#6C63FF"
-            label="Default Quality"
-            value="1080p"
-            chevron
             isLast
           />
         </SettingsSection>

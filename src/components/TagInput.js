@@ -10,9 +10,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { movementTags as defaultTags } from '../data/placeholderData';
 
-export default function TagInput({ selectedTags, onTagsChange, onFocus, onBlur }) {
+export default function TagInput({ selectedTags, onTagsChange, onFocus, onBlur, predefinedValues, placeholder }) {
   const [query, setQuery] = useState('');
-  const [allTags, setAllTags] = useState(defaultTags);
+  const [allTags, setAllTags] = useState(predefinedValues ?? defaultTags);
   const inputRef = useRef(null);
 
   const suggestions = query.trim().length > 0
@@ -82,7 +82,7 @@ export default function TagInput({ selectedTags, onTagsChange, onFocus, onBlur }
           style={styles.input}
           value={query}
           onChangeText={setQuery}
-          placeholder="Search movements..."
+          placeholder={placeholder ?? 'Search movements...'}
           placeholderTextColor="#555"
           autoCorrect={false}
           autoCapitalize="none"
@@ -105,13 +105,11 @@ export default function TagInput({ selectedTags, onTagsChange, onFocus, onBlur }
               style={styles.dropdownItem}
               onPress={() => addTag(tag)}
             >
-              <Ionicons name="fitness-outline" size={14} color="#6C63FF" style={styles.dropdownIcon} />
               <Text style={styles.dropdownText}>{tag}</Text>
             </TouchableOpacity>
           ))}
           {showAddOption && (
             <TouchableOpacity style={styles.dropdownItem} onPress={addCustomTag}>
-              <Ionicons name="add-circle-outline" size={14} color="#FF9F43" style={styles.dropdownIcon} />
               <Text style={[styles.dropdownText, styles.addText]}>
                 Add "{query.trim()}"
               </Text>
@@ -193,9 +191,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#2A2A3E',
-  },
-  dropdownIcon: {
-    marginRight: 10,
   },
   dropdownText: {
     color: '#FFF',
