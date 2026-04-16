@@ -1,4 +1,5 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -64,6 +65,21 @@ export default function DashboardScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const sortBtnRef = useRef(null);
   const searchInputRef = useRef(null);
+  const videosLoaded = useRef(false);
+
+  // Load persisted videos on mount
+  useEffect(() => {
+    AsyncStorage.getItem('@workout_vault_videos').then((val) => {
+      if (val) setVideos(JSON.parse(val));
+      videosLoaded.current = true;
+    }).catch(() => { videosLoaded.current = true; });
+  }, []);
+
+  // Save whenever videos change (but not before the initial load completes)
+  useEffect(() => {
+    if (!videosLoaded.current) return;
+    AsyncStorage.setItem('@workout_vault_videos', JSON.stringify(videos)).catch(() => {});
+  }, [videos]);
 
   const availableDisciplines = [...new Set(videos.flatMap((v) => v.movementTypes ?? []))].sort();
   const availableSkills = [...new Set(videos.flatMap((v) => v.tags ?? []))].sort();
@@ -99,6 +115,17 @@ export default function DashboardScreen({ navigation }) {
     navigation.navigate('Edit', {
       video,
       onSave: (updated) => setVideos((prev) => prev.map((v) => v.id === updated.id ? updated : v)),
+    });
+  }
+
+  function handleEditFromSheet(video) {
+    navigation.navigate('Edit', {
+      video,
+      onSave: (updated) => {
+        setVideos((prev) => prev.map((v) => v.id === updated.id ? updated : v));
+        setSelectedVideo(updated);
+        setSheetVisible(true);
+      },
     });
   }
 
@@ -141,18 +168,18 @@ export default function DashboardScreen({ navigation }) {
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Movement Log</Text>
-        <View style={styles.headerRight}>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>Movement Log</Text>
           <View style={styles.betaTag}>
             <Text style={styles.betaText}>Beta</Text>
           </View>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Settings')}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="settings-outline" size={22} color={colors.textSecondary} />
-          </TouchableOpacity>
         </View>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Settings')}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="settings-outline" size={22} color={colors.textSecondary} />
+        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -268,7 +295,7 @@ export default function DashboardScreen({ navigation }) {
         video={selectedVideo}
         visible={sheetVisible}
         onClose={closeSheet}
-        onEdit={handleEdit}
+        onEdit={handleEditFromSheet}
         onDelete={handleDelete}
       />
 
@@ -326,16 +353,16 @@ export default function DashboardScreen({ navigation }) {
       <Modal visible={!!deleteTarget} transparent animationType="fade" onRequestClose={() => setDeleteTarget(null)}>
         <View style={styles.dialogOverlay}>
           <View style={styles.dialog}>
-            <Text style={styles.dialogTitle}>Delete video?</Text>
+            <Text style={styles.dialogTitle}>Remove video?</Text>
             <Text style={styles.dialogSubtitle} numberOfLines={2}>
               "{deleteTarget?.title}" will be permanently removed.
             </Text>
             <View style={styles.dialogActions}>
-              <TouchableOpacity style={[styles.dialogBtn, { backgroundColor: colors.surfaceElevated }]} onPress={() => setDeleteTarget(null)} activeOpacity={0.8}>
-                <Text style={[styles.dialogBtnText, { color: colors.textSecondary }]}>Cancel</Text>
+              <TouchableOpacity style={[styles.dialogBtn, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]} onPress={() => setDeleteTarget(null)} activeOpacity={0.8}>
+                <Text style={[styles.dialogBtnText, { color: colors.text }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.dialogBtn, { backgroundColor: colors.dangerBg, borderWidth: 1, borderColor: colors.dangerBorder }]} onPress={confirmDelete} activeOpacity={0.8}>
-                <Text style={[styles.dialogBtnText, { color: colors.danger, fontWeight: '700' }]}>Delete</Text>
+                <Text style={[styles.dialogBtnText, { color: colors.danger, fontWeight: '700' }]}>Remove</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -362,10 +389,10 @@ function getStyles(colors) {
       borderBottomColor: colors.border,
       zIndex: 1,
     },
-    headerRight: {
+    titleRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
+      gap: 8,
     },
     title: {
       color: colors.text,

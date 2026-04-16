@@ -53,11 +53,11 @@ export default function VideoCard({ video, onPress, onEdit, onDelete }) {
         <View style={styles.titleGroup}>
           <Text style={styles.title} numberOfLines={1}>{video.title}</Text>
           <View style={styles.metaRow}>
-            <Ionicons name="time-outline" size={13} color={colors.textSecondary} />
-            <Text style={styles.meta}>{video.duration}</Text>
-            <View style={styles.dot} />
             <Ionicons name="calendar-outline" size={13} color={colors.textSecondary} />
             <Text style={styles.meta}>{video.date}</Text>
+            <View style={styles.dot} />
+            <Ionicons name="time-outline" size={13} color={colors.textSecondary} />
+            <Text style={styles.meta}>{video.duration}</Text>
           </View>
         </View>
 
@@ -97,12 +97,10 @@ export default function VideoCard({ video, onPress, onEdit, onDelete }) {
         <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setMenuVisible(false)} />
         <View style={[styles.menu, { top: menuPos.y + 4, right: 16 }]}>
           <TouchableOpacity style={[styles.menuItem, { borderBottomWidth: 1, borderBottomColor: colors.border }]} onPress={handleEdit}>
-            <Ionicons name="pencil-outline" size={15} color={colors.textSecondary} />
             <Text style={styles.menuLabel}>Edit</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuItem} onPress={handleDelete}>
-            <Ionicons name="trash-outline" size={15} color={colors.danger} />
-            <Text style={[styles.menuLabel, { color: colors.danger }]}>Delete</Text>
+            <Text style={[styles.menuLabel, { color: colors.danger }]}>Remove</Text>
           </TouchableOpacity>
         </View>
       </Modal>
@@ -153,22 +151,22 @@ function getStyles(colors) {
     },
     info: {
       flex: 1,
-      gap: 16,
+      gap: 8,
     },
     titleGroup: {
-      gap: 8,
+      gap: 4,
     },
     disciplineGroup: {
-      gap: 8,
+      gap: 4,
     },
     title: {
       color: colors.text,
-      fontSize: 15,
+      fontSize: 16,
       fontWeight: '600',
     },
     movementTypes: {
       color: colors.subtle,
-      fontSize: 11,
+      fontSize: 12,
       fontStyle: 'italic',
     },
     metaRow: {

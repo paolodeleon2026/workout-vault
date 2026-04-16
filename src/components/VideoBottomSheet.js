@@ -8,57 +8,142 @@ import {
   ScrollView,
   PanResponder,
   TouchableOpacity,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme';
+import { MOVEMENT_TYPE_ORDER } from '../data/placeholderData';
 
 const { width, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SHEET_HEIGHT = SCREEN_HEIGHT * 0.75;
 const VIDEO_HEIGHT = width * (9 / 16);
+const DISMISS_THRESHOLD = SHEET_HEIGHT * 0.3;
 
 export default function VideoBottomSheet({ video, visible, onClose, onEdit, onDelete }) {
   const { colors } = useTheme();
   const styles = useMemo(() => getStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
 
-  const player = useVideoPlayer(null, () => {});
+  const sortedTypes = (video?.movementTypes ?? []).slice().sort(
+    (a, b) => MOVEMENT_TYPE_ORDER.indexOf(a) - MOVEMENT_TYPE_ORDER.indexOf(b)
+  );
 
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  // Reset position whenever the sheet opens
   useEffect(() => {
-    if (!player) return;
-    try {
-      if (visible && video?.videoUri) {
-        player.replace(video.videoUri);
-        player.play();
-      } else {
-        player.pause();
-      }
-    } catch (_) {}
-  }, [visible, video?.videoUri]);
+    if (visible) {
+      translateY.setValue(0);
+    }
+  }, [visible]);
+
+  // Keep a ref to the latest dismiss/snapOpen so the PanResponder (created once)
+  // always calls the current version and never holds a stale closure.
+  const dismissRef = useRef(null);
+  const snapOpenRef = useRef(null);
+
+  function dismiss(afterAction) {
+    Animated.timing(translateY, {
+      toValue: SHEET_HEIGHT,
+      duration: 220,
+      useNativeDriver: true,
+    }).start(() => {
+      onClose();
+      if (typeof afterAction === 'function') afterAction();
+    });
+  }
+
+  function snapOpen() {
+    Animated.spring(translateY, {
+      toValue: 0,
+      useNativeDriver: true,
+      bounciness: 4,
+    }).start();
+  }
+
+  dismissRef.current = dismiss;
+  snapOpenRef.current = snapOpen;
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, { dy }) => dy > 5,
-      onPanResponderRelease: (_, { dy }) => {
-        if (dy > 50) onClose();
+      onMoveShouldSetPanResponder: (_, { dy }) => Math.abs(dy) > 3,
+      onPanResponderMove: (_, { dy }) => {
+        translateY.setValue(Math.max(0, dy));
+      },
+      onPanResponderRelease: (_, { dy, vy }) => {
+        const fastFlick = vy > 0.5;
+        const draggedFar = dy > DISMISS_THRESHOLD;
+        if (fastFlick || draggedFar) {
+          dismissRef.current();
+        } else {
+          snapOpenRef.current();
+        }
       },
     })
   ).current;
+
+  // Backdrop fades out as the sheet is dragged down
+  const backdropOpacity = translateY.interpolate({
+    inputRange: [0, SHEET_HEIGHT],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const player = useVideoPlayer(video?.videoUri ? { uri: video.videoUri } : null, (p) => {
+    p.loop = false;
+  });
+
+  useEffect(() => {
+    if (visible && video?.videoUri) {
+      let sub;
+      try {
+        sub = player.addListener('statusChange', ({ status }) => {
+          if (status === 'readyToPlay') {
+            try { player.play(); } catch (_) {}
+          }
+        });
+        player.replace({ uri: video.videoUri });
+        player.play();
+      } catch (_) {}
+      return () => { try { sub?.remove(); } catch (_) {} };
+    } else {
+      try { player.pause(); } catch (_) {}
+    }
+  }, [visible, video?.videoUri]);
 
   return (
     <Modal
       visible={visible && !!video}
       transparent
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={() => dismiss()}
       statusBarTranslucent
     >
-      <View style={styles.overlay}>
-        <View style={styles.backdrop} onStartShouldSetResponder={() => { onClose(); return true; }} />
+      {/* Animated background fade — pointerEvents none so it NEVER blocks touches */}
+      <Animated.View
+        style={[styles.backdrop, { opacity: backdropOpacity }]}
+        pointerEvents="none"
+      />
 
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+      <View style={styles.overlay}>
+        {/* Dismiss tap target — only covers the area ABOVE the sheet, never overlaps it */}
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          activeOpacity={1}
+          onPress={() => dismiss()}
+        />
+
+        <Animated.View
+          style={[
+            styles.sheet,
+            { paddingBottom: Math.max(insets.bottom, 16) },
+            { transform: [{ translateY }] },
+          ]}
+        >
+          {/* Drag handle — full-width grab area */}
           <View style={styles.handleWrap} {...panResponder.panHandlers}>
             <View style={styles.handle} />
           </View>
@@ -76,34 +161,37 @@ export default function VideoBottomSheet({ video, visible, onClose, onEdit, onDe
             contentContainerStyle={styles.info}
             showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.title}>{video?.title}</Text>
-
-            <View style={styles.metaRow}>
-              <Ionicons name="calendar-outline" size={14} color={colors.textSecondary} />
-              <Text style={styles.metaText}>{video?.date}</Text>
-              {video?.size ? (
-                <>
-                  <View style={styles.dot} />
-                  <Ionicons name="server-outline" size={14} color={colors.textSecondary} />
-                  <Text style={styles.metaText}>{video.size}</Text>
-                </>
-              ) : null}
-              {video?.duration && video.duration !== '0:00' ? (
-                <>
-                  <View style={styles.dot} />
-                  <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
-                  <Text style={styles.metaText}>{video.duration}</Text>
-                </>
-              ) : null}
+            {/* Group 1: title + meta */}
+            <View style={styles.titleGroup}>
+              <Text style={styles.title}>{video?.title}</Text>
+              <View style={styles.metaRow}>
+                <Ionicons name="calendar-outline" size={14} color={colors.textSecondary} />
+                <Text style={styles.metaText}>{video?.date}</Text>
+                {video?.duration && video.duration !== '0:00' ? (
+                  <>
+                    <View style={styles.dot} />
+                    <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
+                    <Text style={styles.metaText}>{video.duration}</Text>
+                  </>
+                ) : null}
+              </View>
             </View>
 
-            {video?.tags?.length > 0 && (
-              <View style={styles.tags}>
-                {video.tags.map((tag) => (
-                  <View key={tag} style={styles.tag}>
-                    <Text style={styles.tagText}>{tag}</Text>
+            {/* Group 2: discipline label + skill chips */}
+            {(sortedTypes.length > 0 || video?.tags?.length > 0) && (
+              <View style={styles.disciplineGroup}>
+                {sortedTypes.length > 0 && (
+                  <Text style={styles.movementTypes}>{sortedTypes.join(' · ')}</Text>
+                )}
+                {video?.tags?.length > 0 && (
+                  <View style={styles.tags}>
+                    {video.tags.map((tag) => (
+                      <View key={tag} style={styles.tag}>
+                        <Text style={styles.tagText}>{tag}</Text>
+                      </View>
+                    ))}
                   </View>
-                ))}
+                )}
               </View>
             )}
 
@@ -112,17 +200,23 @@ export default function VideoBottomSheet({ video, visible, onClose, onEdit, onDe
             ) : null}
 
             <View style={styles.actions}>
-              <TouchableOpacity style={styles.actionBtn} onPress={() => { onClose(); onEdit?.(video); }} activeOpacity={0.8}>
-                <Ionicons name="pencil-outline" size={16} color={colors.textSecondary} />
-                <Text style={styles.actionText}>Edit</Text>
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.actionBtnEdit]}
+                onPress={() => { onClose(); onEdit?.(video); }}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.actionText, { color: colors.text }]}>Edit</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.actionBtn, styles.actionBtnDanger]} onPress={() => { onClose(); onDelete?.(video); }} activeOpacity={0.8}>
-                <Ionicons name="trash-outline" size={16} color={colors.danger} />
-                <Text style={[styles.actionText, { color: colors.danger }]}>Delete</Text>
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.actionBtnDanger]}
+                onPress={() => { onClose(); onDelete?.(video); }}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.actionText, { color: colors.danger }]}>Remove</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -133,10 +227,10 @@ function getStyles(colors) {
     overlay: {
       flex: 1,
       justifyContent: 'flex-end',
-      backgroundColor: colors.overlay,
     },
     backdrop: {
       ...StyleSheet.absoluteFillObject,
+      backgroundColor: colors.overlay,
     },
     sheet: {
       height: SHEET_HEIGHT,
@@ -147,7 +241,7 @@ function getStyles(colors) {
     },
     handleWrap: {
       alignItems: 'center',
-      paddingVertical: 10,
+      paddingVertical: 12,
     },
     handle: {
       width: 36,
@@ -165,12 +259,23 @@ function getStyles(colors) {
     },
     info: {
       padding: 16,
-      gap: 12,
+      gap: 8,
+    },
+    titleGroup: {
+      gap: 4,
+    },
+    disciplineGroup: {
+      gap: 4,
     },
     title: {
       color: colors.text,
-      fontSize: 16,
+      fontSize: 18,
       fontWeight: '700',
+    },
+    movementTypes: {
+      color: colors.subtle,
+      fontSize: 13,
+      fontStyle: 'italic',
     },
     metaRow: {
       flexDirection: 'row',
@@ -192,20 +297,17 @@ function getStyles(colors) {
     tags: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 8,
+      gap: 4,
     },
     tag: {
-      backgroundColor: colors.accentBg,
-      borderWidth: 1,
-      borderColor: colors.accentBorder,
-      paddingHorizontal: 10,
-      paddingVertical: 4,
+      backgroundColor: colors.surfaceElevated,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
       borderRadius: 20,
     },
     tagText: {
-      color: colors.accent,
+      color: colors.textSecondary,
       fontSize: 12,
-      fontWeight: '600',
     },
     description: {
       color: colors.textSecondary,
@@ -226,6 +328,11 @@ function getStyles(colors) {
       backgroundColor: colors.surfaceElevated,
       borderRadius: 12,
       paddingVertical: 12,
+    },
+    actionBtnEdit: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     actionBtnDanger: {
       backgroundColor: colors.dangerBg,

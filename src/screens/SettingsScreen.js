@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,17 +8,25 @@ import {
   Switch,
   StatusBar,
   Modal,
+  Animated,
+  PanResponder,
+  Dimensions,
 } from 'react-native';
+
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme';
 import { PRIVACY_POLICY } from '../data/privacyPolicy';
 
-function SettingsSection({ title, children, colors }) {
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const DEFAULT_HEIGHT = SCREEN_HEIGHT * 0.5;
+const EXPANDED_HEIGHT = SCREEN_HEIGHT * 0.85;
+
+function SettingsSection({ title, children, colors, isDark }) {
   return (
     <View style={styles.section}>
       <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{title}</Text>
-      <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowOpacity: isDark ? 0.06 : 0, elevation: isDark ? 2 : 0 }]}>
         {children}
       </View>
     </View>
@@ -58,6 +66,47 @@ export default function SettingsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const [privacyVisible, setPrivacyVisible] = useState(false);
 
+  const sheetHeight = useRef(new Animated.Value(DEFAULT_HEIGHT)).current;
+  const lastHeight = useRef(DEFAULT_HEIGHT);
+
+  useEffect(() => {
+    if (privacyVisible) {
+      sheetHeight.setValue(DEFAULT_HEIGHT);
+      lastHeight.current = DEFAULT_HEIGHT;
+    }
+  }, [privacyVisible]);
+
+  function snapTo(height) {
+    lastHeight.current = height;
+    Animated.spring(sheetHeight, {
+      toValue: height,
+      useNativeDriver: false,
+      bounciness: 4,
+    }).start();
+  }
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 4,
+      onPanResponderMove: (_, g) => {
+        const next = lastHeight.current - g.dy;
+        sheetHeight.setValue(Math.min(EXPANDED_HEIGHT, Math.max(120, next)));
+      },
+      onPanResponderRelease: (_, g) => {
+        const cur = lastHeight.current - g.dy;
+        const mid = (DEFAULT_HEIGHT + EXPANDED_HEIGHT) / 2;
+        if (g.dy < -40 || cur > mid) {
+          snapTo(EXPANDED_HEIGHT);
+        } else if (g.dy > 40 || cur < mid) {
+          snapTo(DEFAULT_HEIGHT);
+        } else {
+          snapTo(lastHeight.current);
+        }
+      },
+    })
+  ).current;
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
       <StatusBar barStyle={colors.statusBar} backgroundColor={colors.statusBarBg} />
@@ -79,7 +128,7 @@ export default function SettingsScreen({ navigation }) {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
       >
         {/* Upload section */}
-        <SettingsSection title="Upload" colors={colors}>
+        <SettingsSection title="Upload" colors={colors} isDark={isDark}>
           <SettingsRow
             icon="wifi-outline"
             iconColor={colors.success}
@@ -93,7 +142,7 @@ export default function SettingsScreen({ navigation }) {
         </SettingsSection>
 
         {/* Appearance section */}
-        <SettingsSection title="Appearance" colors={colors}>
+        <SettingsSection title="Appearance" colors={colors} isDark={isDark}>
           <SettingsRow
             icon="moon-outline"
             iconColor={colors.accent}
@@ -107,7 +156,7 @@ export default function SettingsScreen({ navigation }) {
         </SettingsSection>
 
         {/* About section */}
-        <SettingsSection title="About" colors={colors}>
+        <SettingsSection title="About" colors={colors} isDark={isDark}>
           <SettingsRow
             icon="information-circle-outline"
             iconColor={colors.accent}
@@ -148,8 +197,9 @@ export default function SettingsScreen({ navigation }) {
             activeOpacity={1}
             onPress={() => setPrivacyVisible(false)}
           />
-          <View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 16 }]}>
-            <View style={styles.sheetHandle}>
+          <Animated.View style={[styles.sheet, { height: sheetHeight, backgroundColor: colors.surface }]}>
+            {/* Drag handle */}
+            <View style={styles.sheetHandle} {...panResponder.panHandlers}>
               <View style={[styles.handle, { backgroundColor: colors.border }]} />
             </View>
             <View style={[styles.sheetHeader, { borderBottomColor: colors.border }]}>
@@ -160,14 +210,14 @@ export default function SettingsScreen({ navigation }) {
             </View>
             <ScrollView
               style={styles.sheetScroll}
-              contentContainerStyle={styles.sheetScrollContent}
+              contentContainerStyle={[styles.sheetScrollContent, { paddingBottom: insets.bottom + 16 }]}
               showsVerticalScrollIndicator={false}
             >
               <Text style={[styles.policyText, { color: colors.textSecondary }]}>
                 {PRIVACY_POLICY}
               </Text>
             </ScrollView>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     </SafeAreaView>
@@ -218,9 +268,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
     shadowRadius: 4,
-    elevation: 2,
   },
   row: {
     flexDirection: 'row',
@@ -267,7 +315,6 @@ const styles = StyleSheet.create({
   sheet: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '85%',
   },
   sheetHandle: {
     alignItems: 'center',

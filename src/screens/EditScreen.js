@@ -228,7 +228,6 @@ export default function EditScreen({ navigation, route }) {
           onPress={handleSave}
           activeOpacity={canSave ? 0.8 : 1}
         >
-          <Ionicons name="checkmark" size={20} color={canSave ? '#FFF' : colors.textMuted} />
           <Text style={[styles.submitText, !canSave && styles.submitTextDisabled]}>Save Changes</Text>
         </TouchableOpacity>
       </View>

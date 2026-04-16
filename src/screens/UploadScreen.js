@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as VideoThumbnails from 'expo-video-thumbnails';
+import * as FileSystem from 'expo-file-system/legacy';
 import { createVideoPlayer } from 'expo-video';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import TagInput from '../components/TagInput';
@@ -102,7 +103,8 @@ export default function UploadScreen({ navigation, route }) {
       let fileSize = null;
 
       if (Platform.OS === 'android') {
-        const result = await DocumentPicker.getDocumentAsync({ type: 'video/*', copyToCacheDirectory: false });
+        // copyToCacheDirectory: true gives a file:// URI that FileSystem can read
+        const result = await DocumentPicker.getDocumentAsync({ type: 'video/*', copyToCacheDirectory: true });
         if (!result.canceled && result.assets.length > 0 && result.assets[0].uri) {
           uri = result.assets[0].uri;
           fileSize = result.assets[0].size ?? null;
@@ -118,16 +120,25 @@ export default function UploadScreen({ navigation, route }) {
       }
 
       if (!uri) return;
-      setVideo({ uri, fileSize });
 
+      // Copy video into documentDirectory (permanent storage that survives restarts)
+      const videoExt = uri.match(/\.(\w+)(?:\?|$)/)?.[1] ?? 'mp4';
+      const permanentVideoUri = FileSystem.documentDirectory + `video_${Date.now()}.${videoExt}`;
+      await FileSystem.copyAsync({ from: uri, to: permanentVideoUri });
+
+      setVideo({ uri: permanentVideoUri, fileSize });
+
+      // Generate thumbnail from the permanent copy, then persist it too
       try {
-        const { uri: thumb } = await VideoThumbnails.getThumbnailAsync(uri, { time: 0 });
-        setThumbnailUri(thumb);
+        const { uri: thumb } = await VideoThumbnails.getThumbnailAsync(permanentVideoUri, { time: 0 });
+        const permanentThumbUri = FileSystem.documentDirectory + `thumb_${Date.now()}.jpg`;
+        await FileSystem.copyAsync({ from: thumb, to: permanentThumbUri });
+        setThumbnailUri(permanentThumbUri);
       } catch (_) {
         setThumbnailUri(null);
       }
 
-      const dur = await extractDuration(uri);
+      const dur = await extractDuration(permanentVideoUri);
       setDuration(dur);
     } catch (e) {
       // silently ignore picker errors
