@@ -1,12 +1,16 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MOVEMENT_TYPE_ORDER } from '../data/placeholderData';
+import { useTheme } from '../theme';
 
 export default function VideoCard({ video, onPress, onEdit, onDelete }) {
+  const { colors } = useTheme();
   const [menuVisible, setMenuVisible] = useState(false);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
   const moreBtnRef = useRef(null);
+
+  const styles = useMemo(() => getStyles(colors), [colors]);
 
   const sortedTypes = (video.movementTypes ?? []).slice().sort(
     (a, b) => MOVEMENT_TYPE_ORDER.indexOf(a) - MOVEMENT_TYPE_ORDER.indexOf(b)
@@ -36,7 +40,7 @@ export default function VideoCard({ video, onPress, onEdit, onDelete }) {
           <Image source={{ uri: video.thumbnail }} style={styles.thumbnailImage} resizeMode="cover" />
         ) : (
           <View style={styles.thumbnailPlaceholder}>
-            <Ionicons name="play-circle" size={40} color="#6C63FF" />
+            <Ionicons name="play-circle" size={40} color={colors.accent} />
           </View>
         )}
         <View style={styles.playOverlay}>
@@ -45,31 +49,35 @@ export default function VideoCard({ video, onPress, onEdit, onDelete }) {
       </View>
 
       <View style={styles.info}>
-        <Text style={styles.title} numberOfLines={1}>{video.title}</Text>
-
-        {/* Movement types — directly below title */}
-        {sortedTypes.length > 0 && (
-          <Text style={styles.movementTypes} numberOfLines={1}>
-            {sortedTypes.join(' · ')}
-          </Text>
-        )}
-
-        <View style={styles.metaRow}>
-          <Ionicons name="time-outline" size={13} color="#888" />
-          <Text style={styles.meta}>{video.duration}</Text>
-          <View style={styles.dot} />
-          <Ionicons name="calendar-outline" size={13} color="#888" />
-          <Text style={styles.meta}>{video.date}</Text>
+        {/* Group 1: title + meta (8px apart) */}
+        <View style={styles.titleGroup}>
+          <Text style={styles.title} numberOfLines={1}>{video.title}</Text>
+          <View style={styles.metaRow}>
+            <Ionicons name="time-outline" size={13} color={colors.textSecondary} />
+            <Text style={styles.meta}>{video.duration}</Text>
+            <View style={styles.dot} />
+            <Ionicons name="calendar-outline" size={13} color={colors.textSecondary} />
+            <Text style={styles.meta}>{video.date}</Text>
+          </View>
         </View>
 
-        {/* Movement tags — 16px gap from above content */}
-        {video.tags?.length > 0 && (
-          <View style={styles.tags}>
-            {video.tags.map((tag) => (
-              <View key={tag} style={styles.tag}>
-                <Text style={styles.tagText}>{tag}</Text>
+        {/* Group 2: discipline label + skill chips (8px apart), 16px below group 1 */}
+        {(sortedTypes.length > 0 || video.tags?.length > 0) && (
+          <View style={styles.disciplineGroup}>
+            {sortedTypes.length > 0 && (
+              <Text style={styles.movementTypes} numberOfLines={1}>
+                {sortedTypes.join(' · ')}
+              </Text>
+            )}
+            {video.tags?.length > 0 && (
+              <View style={styles.tags}>
+                {video.tags.map((tag) => (
+                  <View key={tag} style={styles.tag}>
+                    <Text style={styles.tagText}>{tag}</Text>
+                  </View>
+                ))}
               </View>
-            ))}
+            )}
           </View>
         )}
       </View>
@@ -81,20 +89,20 @@ export default function VideoCard({ video, onPress, onEdit, onDelete }) {
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         onPress={openMenu}
       >
-        <Ionicons name="ellipsis-vertical" size={18} color="#888" />
+        <Ionicons name="ellipsis-vertical" size={18} color={colors.textSecondary} />
       </TouchableOpacity>
 
       {/* Ellipsis popover */}
       <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
-        <TouchableOpacity style={styles.menuBackdrop} activeOpacity={1} onPress={() => setMenuVisible(false)} />
+        <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setMenuVisible(false)} />
         <View style={[styles.menu, { top: menuPos.y + 4, right: 16 }]}>
-          <TouchableOpacity style={[styles.menuItem, styles.menuItemBorder]} onPress={handleEdit}>
-            <Ionicons name="pencil-outline" size={15} color="#CCC" />
+          <TouchableOpacity style={[styles.menuItem, { borderBottomWidth: 1, borderBottomColor: colors.border }]} onPress={handleEdit}>
+            <Ionicons name="pencil-outline" size={15} color={colors.textSecondary} />
             <Text style={styles.menuLabel}>Edit</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuItem} onPress={handleDelete}>
-            <Ionicons name="trash-outline" size={15} color="#FF6584" />
-            <Text style={[styles.menuLabel, styles.menuLabelDanger]}>Delete</Text>
+            <Ionicons name="trash-outline" size={15} color={colors.danger} />
+            <Text style={[styles.menuLabel, { color: colors.danger }]}>Delete</Text>
           </TouchableOpacity>
         </View>
       </Modal>
@@ -102,130 +110,127 @@ export default function VideoCard({ video, onPress, onEdit, onDelete }) {
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    flexDirection: 'row',
-    backgroundColor: '#1E1E2E',
-    borderRadius: 16,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    padding: 12,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  thumbnailWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 12,
-    marginRight: 12,
-    flexShrink: 0,
-    overflow: 'hidden',
-  },
-  thumbnailImage: {
-    width: '100%',
-    height: '100%',
-  },
-  thumbnailPlaceholder: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#6C63FF22',
-  },
-  playOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.25)',
-  },
-  info: {
-    flex: 1,
-    gap: 4,
-  },
-  title: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  movementTypes: {
-    color: '#4A4A6A',
-    fontSize: 11,
-    fontStyle: 'italic',
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  meta: {
-    color: '#888',
-    fontSize: 12,
-  },
-  dot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: '#555',
-    marginHorizontal: 2,
-  },
-  tags: {
-    flexDirection: 'row',
-    gap: 4,
-    flexWrap: 'wrap',
-    marginTop: 12,
-  },
-  tag: {
-    backgroundColor: '#2A2A3E',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 20,
-  },
-  tagText: {
-    color: '#AAA',
-    fontSize: 11,
-  },
-  moreBtn: {
-    padding: 4,
-    marginLeft: 4,
-    alignSelf: 'flex-start',
-  },
-  menuBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  menu: {
-    position: 'absolute',
-    width: 140,
-    backgroundColor: '#1E1E2E',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#2A2A3E',
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 10,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 10,
-  },
-  menuItemBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#2A2A3E',
-  },
-  menuLabel: {
-    color: '#CCC',
-    fontSize: 14,
-  },
-  menuLabelDanger: {
-    color: '#FF6584',
-  },
-});
+function getStyles(colors) {
+  return StyleSheet.create({
+    card: {
+      flexDirection: 'row',
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      marginHorizontal: 16,
+      marginBottom: 12,
+      padding: 12,
+      alignItems: 'flex-start',
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+      elevation: 4,
+    },
+    thumbnailWrap: {
+      width: 64,
+      height: 64,
+      borderRadius: 12,
+      marginRight: 12,
+      flexShrink: 0,
+      overflow: 'hidden',
+    },
+    thumbnailImage: {
+      width: '100%',
+      height: '100%',
+    },
+    thumbnailPlaceholder: {
+      width: '100%',
+      height: '100%',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.accentBg,
+    },
+    playOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.25)',
+    },
+    info: {
+      flex: 1,
+      gap: 16,
+    },
+    titleGroup: {
+      gap: 8,
+    },
+    disciplineGroup: {
+      gap: 8,
+    },
+    title: {
+      color: colors.text,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    movementTypes: {
+      color: colors.subtle,
+      fontSize: 11,
+      fontStyle: 'italic',
+    },
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    meta: {
+      color: colors.textSecondary,
+      fontSize: 12,
+    },
+    dot: {
+      width: 3,
+      height: 3,
+      borderRadius: 1.5,
+      backgroundColor: colors.textMuted,
+      marginHorizontal: 2,
+    },
+    tags: {
+      flexDirection: 'row',
+      gap: 4,
+      flexWrap: 'wrap',
+    },
+    tag: {
+      backgroundColor: colors.surfaceElevated,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 20,
+    },
+    tagText: {
+      color: colors.textSecondary,
+      fontSize: 11,
+    },
+    moreBtn: {
+      padding: 4,
+      marginLeft: 4,
+      alignSelf: 'flex-start',
+    },
+    menu: {
+      position: 'absolute',
+      width: 140,
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      elevation: 10,
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      gap: 10,
+    },
+    menuLabel: {
+      color: colors.textSecondary,
+      fontSize: 14,
+    },
+  });
+}

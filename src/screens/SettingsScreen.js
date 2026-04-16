@@ -7,216 +7,204 @@ import {
   TouchableOpacity,
   Switch,
   StatusBar,
+  Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../theme';
+import { PRIVACY_POLICY } from '../data/privacyPolicy';
 
-function SettingsSection({ title, children }) {
+function SettingsSection({ title, children, colors }) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.sectionCard}>{children}</View>
+      <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{title}</Text>
+      <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {children}
+      </View>
     </View>
   );
 }
 
-function SettingsRow({ icon, iconColor, label, value, isLast, toggle, toggleValue, onToggle, chevron }) {
+function SettingsRow({ icon, iconColor, label, isLast, toggle, toggleValue, onToggle, onPress, chevron, colors }) {
   return (
     <TouchableOpacity
-      style={[styles.row, !isLast && styles.rowBorder]}
+      style={[styles.row, !isLast && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
       activeOpacity={toggle ? 1 : 0.7}
+      onPress={onPress}
     >
       <View style={[styles.iconWrap, { backgroundColor: iconColor + '22' }]}>
         <Ionicons name={icon} size={18} color={iconColor} />
       </View>
-      <Text style={styles.rowLabel}>{label}</Text>
+      <Text style={[styles.rowLabel, { color: colors.text }]}>{label}</Text>
       <View style={styles.rowRight}>
-        {value ? <Text style={styles.rowValue}>{value}</Text> : null}
         {toggle ? (
           <Switch
             value={toggleValue}
             onValueChange={onToggle}
-            trackColor={{ false: '#2A2A3E', true: '#6C63FF' }}
+            trackColor={{ false: colors.surfaceElevated, true: colors.accent }}
             thumbColor="#FFF"
           />
         ) : null}
         {chevron && !toggle ? (
-          <Ionicons name="chevron-forward" size={16} color="#555" />
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
         ) : null}
       </View>
     </TouchableOpacity>
   );
 }
 
-export default function SettingsScreen() {
-  const [wifiOnly, setWifiOnly] = useState(true);
-  const [darkMode, setDarkMode] = useState(true);
+export default function SettingsScreen({ navigation }) {
+  const { colors, isDark, setDark, wifiOnly, setWifiOnly } = useTheme();
+  const insets = useSafeAreaInsets();
+  const [privacyVisible, setPrivacyVisible] = useState(false);
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor="#12121E" />
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle={colors.statusBar} backgroundColor={colors.statusBarBg} />
 
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Settings</Text>
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={[styles.backBtn, { backgroundColor: colors.surface }]}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="arrow-back" size={22} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-
-        {/* Profile card */}
-        <View style={styles.profileCard}>
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={32} color="#6C63FF" />
-          </View>
-          <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>Alex Johnson</Text>
-            <Text style={styles.profileEmail}>alex@example.com</Text>
-          </View>
-          <TouchableOpacity style={styles.editBtn} activeOpacity={0.8}>
-            <Text style={styles.editBtnText}>Edit</Text>
-          </TouchableOpacity>
-        </View>
-
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
+      >
         {/* Upload section */}
-        <SettingsSection title="Upload">
+        <SettingsSection title="Upload" colors={colors}>
           <SettingsRow
             icon="wifi-outline"
-            iconColor="#26de81"
+            iconColor={colors.success}
             label="Wi-Fi Only"
             toggle
             toggleValue={wifiOnly}
             onToggle={setWifiOnly}
             isLast
+            colors={colors}
           />
         </SettingsSection>
 
         {/* Appearance section */}
-        <SettingsSection title="Appearance">
+        <SettingsSection title="Appearance" colors={colors}>
           <SettingsRow
             icon="moon-outline"
-            iconColor="#6C63FF"
+            iconColor={colors.accent}
             label="Dark Mode"
             toggle
-            toggleValue={darkMode}
-            onToggle={setDarkMode}
-          />
-          <SettingsRow
-            icon="language-outline"
-            iconColor="#FF9F43"
-            label="Language"
-            value="English"
-            chevron
+            toggleValue={isDark}
+            onToggle={setDark}
             isLast
+            colors={colors}
           />
         </SettingsSection>
 
         {/* About section */}
-        <SettingsSection title="About">
+        <SettingsSection title="About" colors={colors}>
           <SettingsRow
             icon="information-circle-outline"
-            iconColor="#6C63FF"
+            iconColor={colors.accent}
             label="Version"
-            value="1.0.0"
+            colors={colors}
           />
           <SettingsRow
             icon="document-text-outline"
-            iconColor="#888"
+            iconColor={colors.textSecondary}
             label="Privacy Policy"
             chevron
-          />
-          <SettingsRow
-            icon="help-circle-outline"
-            iconColor="#888"
-            label="Help & Support"
-            chevron
+            onPress={() => setPrivacyVisible(true)}
             isLast
+            colors={colors}
           />
         </SettingsSection>
 
         {/* Sign out */}
-        <TouchableOpacity style={styles.signOutBtn} activeOpacity={0.8}>
-          <Ionicons name="log-out-outline" size={18} color="#FF6584" />
-          <Text style={styles.signOutText}>Sign Out</Text>
+        <TouchableOpacity
+          style={[styles.signOutBtn, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="log-out-outline" size={18} color={colors.danger} />
+          <Text style={[styles.signOutText, { color: colors.danger }]}>Sign Out</Text>
         </TouchableOpacity>
-
-        <View style={{ height: 24 }} />
       </ScrollView>
+
+      {/* Privacy Policy bottom sheet */}
+      <Modal
+        visible={privacyVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPrivacyVisible(false)}
+      >
+        <View style={styles.sheetOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setPrivacyVisible(false)}
+          />
+          <View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 16 }]}>
+            <View style={styles.sheetHandle}>
+              <View style={[styles.handle, { backgroundColor: colors.border }]} />
+            </View>
+            <View style={[styles.sheetHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.sheetTitle, { color: colors.text }]}>Privacy Policy</Text>
+              <TouchableOpacity onPress={() => setPrivacyVisible(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              style={styles.sheetScroll}
+              contentContainerStyle={styles.sheetScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={[styles.policyText, { color: colors.textSecondary }]}>
+                {PRIVACY_POLICY}
+              </Text>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#12121E',
-  },
+  safe: { flex: 1 },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 20,
+    paddingBottom: 16,
+    gap: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
   },
   title: {
-    color: '#FFF',
     fontSize: 26,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
   scrollContent: {
-    paddingBottom: 8,
-  },
-  profileCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E1E2E',
-    marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 24,
-    gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#6C63FF22',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  profileName: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  profileEmail: {
-    color: '#888',
-    fontSize: 13,
-  },
-  editBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    backgroundColor: '#2A2A3E',
-    borderRadius: 20,
-  },
-  editBtnText: {
-    color: '#6C63FF',
-    fontWeight: '600',
-    fontSize: 13,
+    paddingTop: 24,
   },
   section: {
     marginHorizontal: 16,
     marginBottom: 20,
   },
   sectionTitle: {
-    color: '#888',
     fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -225,24 +213,20 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   sectionCard: {
-    backgroundColor: '#1E1E2E',
     borderRadius: 16,
     overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
     gap: 12,
-  },
-  rowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#2A2A3E',
   },
   iconWrap: {
     width: 34,
@@ -252,7 +236,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   rowLabel: {
-    color: '#FFF',
     fontSize: 15,
     flex: 1,
   },
@@ -261,25 +244,60 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  rowValue: {
-    color: '#888',
-    fontSize: 14,
-  },
   signOutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 16,
-    backgroundColor: '#FF658422',
     borderRadius: 16,
     padding: 16,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#FF658433',
   },
   signOutText: {
-    color: '#FF6584',
     fontWeight: '700',
     fontSize: 15,
+  },
+  // Privacy policy sheet
+  sheetOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  sheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '85%',
+  },
+  sheetHandle: {
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  sheetTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  sheetScroll: {
+    flex: 1,
+  },
+  sheetScrollContent: {
+    padding: 20,
+  },
+  policyText: {
+    fontSize: 14,
+    lineHeight: 22,
   },
 });

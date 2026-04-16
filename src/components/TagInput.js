@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { movementTags as defaultTags } from '../data/placeholderData';
+import { useTheme } from '../theme';
 
 export default function TagInput({ selectedTags, onTagsChange, onFocus, onBlur, predefinedValues, placeholder }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+
   const [query, setQuery] = useState('');
   const [allTags, setAllTags] = useState(predefinedValues ?? defaultTags);
   const inputRef = useRef(null);
@@ -68,7 +72,7 @@ export default function TagInput({ selectedTags, onTagsChange, onFocus, onBlur, 
                 onPress={() => removeTag(tag)}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               >
-                <Ionicons name="close" size={13} color="#AAA" />
+                <Ionicons name="close" size={13} color={colors.accent} />
               </TouchableOpacity>
             </View>
           ))}
@@ -83,7 +87,7 @@ export default function TagInput({ selectedTags, onTagsChange, onFocus, onBlur, 
           value={query}
           onChangeText={setQuery}
           placeholder={placeholder ?? 'Search movements...'}
-          placeholderTextColor="#555"
+          placeholderTextColor={colors.placeholder}
           autoCorrect={false}
           autoCapitalize="none"
           onFocus={onFocus}
@@ -91,7 +95,7 @@ export default function TagInput({ selectedTags, onTagsChange, onFocus, onBlur, 
         />
         {query.length > 0 && (
           <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-            <Ionicons name="close-circle" size={18} color="#555" />
+            <Ionicons name="close-circle" size={18} color={colors.textMuted} />
           </TouchableOpacity>
         )}
       </View>
@@ -102,15 +106,18 @@ export default function TagInput({ selectedTags, onTagsChange, onFocus, onBlur, 
           {suggestions.map((tag) => (
             <TouchableOpacity
               key={tag}
-              style={styles.dropdownItem}
+              style={[styles.dropdownItem, { borderBottomColor: colors.border }]}
               onPress={() => addTag(tag)}
             >
               <Text style={styles.dropdownText}>{tag}</Text>
             </TouchableOpacity>
           ))}
           {showAddOption && (
-            <TouchableOpacity style={styles.dropdownItem} onPress={addCustomTag}>
-              <Text style={[styles.dropdownText, styles.addText]}>
+            <TouchableOpacity
+              style={[styles.dropdownItem, { borderBottomColor: colors.border }]}
+              onPress={addCustomTag}
+            >
+              <Text style={[styles.dropdownText, { color: colors.warn }]}>
                 Add "{query.trim()}"
               </Text>
             </TouchableOpacity>
@@ -121,82 +128,80 @@ export default function TagInput({ selectedTags, onTagsChange, onFocus, onBlur, 
   );
 }
 
-const styles = StyleSheet.create({
-  wrapper: {
-    position: 'relative',
-    zIndex: 10,
-  },
-  chipsScroll: {
-    marginBottom: 8,
-  },
-  chipsContainer: {
-    gap: 6,
-    paddingRight: 4,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#6C63FF22',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    gap: 5,
-    borderWidth: 1,
-    borderColor: '#6C63FF44',
-  },
-  chipText: {
-    color: '#6C63FF',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#12121E',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#2A2A3E',
-  },
-  input: {
-    flex: 1,
-    color: '#FFF',
-    fontSize: 15,
-    padding: 0,
-  },
-  dropdown: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    backgroundColor: '#1E1E2E',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#2A2A3E',
-    marginTop: 4,
-    zIndex: 100,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2A2A3E',
-  },
-  dropdownText: {
-    color: '#FFF',
-    fontSize: 14,
-  },
-  addText: {
-    color: '#FF9F43',
-  },
-});
+function getStyles(colors) {
+  return StyleSheet.create({
+    wrapper: {
+      position: 'relative',
+      zIndex: 10,
+    },
+    chipsScroll: {
+      marginBottom: 8,
+    },
+    chipsContainer: {
+      gap: 6,
+      paddingRight: 4,
+    },
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.accentBg,
+      borderRadius: 20,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      gap: 5,
+      borderWidth: 1,
+      borderColor: colors.accentBorder,
+    },
+    chipText: {
+      color: colors.accent,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      gap: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    input: {
+      flex: 1,
+      color: colors.text,
+      fontSize: 15,
+      padding: 0,
+    },
+    dropdown: {
+      position: 'absolute',
+      top: '100%',
+      left: 0,
+      right: 0,
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginTop: 4,
+      zIndex: 100,
+      overflow: 'hidden',
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+    dropdownItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+    },
+    dropdownText: {
+      color: colors.text,
+      fontSize: 14,
+    },
+  });
+}

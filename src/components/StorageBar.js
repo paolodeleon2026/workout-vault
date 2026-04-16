@@ -1,7 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useTheme } from '../theme';
 
 export default function StorageBar({ used, total, percentage }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -20,49 +24,51 @@ export default function StorageBar({ used, total, percentage }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#1E1E2E',
-    marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    gap: 8,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  label: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  values: {
-    fontSize: 13,
-  },
-  used: {
-    color: '#6C63FF',
-    fontWeight: '700',
-  },
-  total: {
-    color: '#888',
-  },
-  track: {
-    height: 8,
-    backgroundColor: '#2A2A3E',
-    borderRadius: 4,
-    overflow: 'hidden',
-    flexDirection: 'row',
-  },
-  fill: {
-    flex: 1,
-    borderRadius: 4,
-    backgroundColor: '#6C63FF',
-  },
-  hint: {
-    color: '#555',
-    fontSize: 11,
-  },
-});
+function getStyles(colors) {
+  return StyleSheet.create({
+    container: {
+      backgroundColor: colors.surface,
+      marginHorizontal: 16,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 20,
+      gap: 8,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    label: {
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    values: {
+      fontSize: 13,
+    },
+    used: {
+      color: colors.accent,
+      fontWeight: '700',
+    },
+    total: {
+      color: colors.textSecondary,
+    },
+    track: {
+      height: 8,
+      backgroundColor: colors.surfaceElevated,
+      borderRadius: 4,
+      overflow: 'hidden',
+      flexDirection: 'row',
+    },
+    fill: {
+      flex: 1,
+      borderRadius: 4,
+      backgroundColor: colors.accent,
+    },
+    hint: {
+      color: colors.textMuted,
+      fontSize: 11,
+    },
+  });
+}
