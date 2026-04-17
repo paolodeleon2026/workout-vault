@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "workout-vault",
+    "name": "Movement Log",
     "slug": "workout-vault",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -20,7 +20,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.paolodeleon.movementlog"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -28,7 +29,14 @@
     "plugins": [
       "expo-video",
       "@react-native-community/datetimepicker",
-      "expo-font"
-    ]
+      "expo-font",
+      "expo-media-library"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "fd4c81cd-48a8-4874-9545-416b9d296fd3"
+      }
+    },
+    "owner": "paolodeleon"
   }
 }

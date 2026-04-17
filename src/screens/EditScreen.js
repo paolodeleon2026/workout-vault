@@ -17,6 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as VideoThumbnails from 'expo-video-thumbnails';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as MediaLibrary from 'expo-media-library';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import TagInput from '../components/TagInput';
 import { movementDisciplines } from '../data/placeholderData';
@@ -94,8 +96,36 @@ export default function EditScreen({ navigation, route }) {
       videoUri: videoUri ?? video.videoUri,
       thumbnail: thumbnailUri ?? video.thumbnail,
     };
+    // Fire gallery sync in background — doesn't block the save
+    syncGalleryInBackground(updated);
     onSave?.(updated);
     navigation.goBack();
+  }
+
+  async function syncGalleryInBackground(updated) {
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') return;
+
+      if (updated.mediaLibraryAssetId) {
+        try { await MediaLibrary.deleteAssetsAsync([updated.mediaLibraryAssetId]); } catch (_) {}
+      }
+
+      const sanitized = updated.title.replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_') || 'video';
+      const tempUri = FileSystem.documentDirectory + `${sanitized}_tmp.mp4`;
+      await FileSystem.copyAsync({ from: updated.videoUri, to: tempUri });
+
+      const asset = await MediaLibrary.createAssetAsync(tempUri);
+
+      const album = await MediaLibrary.getAlbumAsync('Movement Log');
+      if (album) {
+        await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+      } else {
+        await MediaLibrary.createAlbumAsync('Movement Log', asset, false);
+      }
+
+      try { await FileSystem.deleteAsync(tempUri, { idempotent: true }); } catch (_) {}
+    } catch (_) {}
   }
 
   function handleClose() { setShowDiscardDialog(true); }

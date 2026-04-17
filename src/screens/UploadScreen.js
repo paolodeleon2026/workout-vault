@@ -19,6 +19,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as MediaLibrary from 'expo-media-library';
 import { createVideoPlayer } from 'expo-video';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import TagInput from '../components/TagInput';
@@ -145,8 +146,33 @@ export default function UploadScreen({ navigation, route }) {
     }
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!canSubmit) return;
+
+    let mediaLibraryAssetId = null;
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status === 'granted') {
+        // Copy video to a temp file named after the title so the gallery entry has a readable name
+        const sanitized = title.trim().replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_') || 'video';
+        const tempUri = FileSystem.documentDirectory + `${sanitized}_tmp.mp4`;
+        await FileSystem.copyAsync({ from: video.uri, to: tempUri });
+
+        const asset = await MediaLibrary.createAssetAsync(tempUri);
+
+        // Create or reuse the "Movement Log" album
+        const album = await MediaLibrary.getAlbumAsync('Movement Log');
+        if (album) {
+          await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+        } else {
+          await MediaLibrary.createAlbumAsync('Movement Log', asset, false);
+        }
+
+        mediaLibraryAssetId = asset.id;
+        try { await FileSystem.deleteAsync(tempUri, { idempotent: true }); } catch (_) {}
+      }
+    } catch (_) {}
+
     const newVideo = {
       id: Date.now().toString(),
       title: title.trim(),
@@ -159,6 +185,7 @@ export default function UploadScreen({ navigation, route }) {
       movementTypes: selectedTypes,
       tags,
       description: description.trim(),
+      mediaLibraryAssetId,
     };
     route.params?.onAdd(newVideo);
     navigation.goBack();
